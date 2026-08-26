@@ -1,26 +1,66 @@
 /* ============================================================
    HOKM ONLINE
-   MISSIONS SYSTEM
+   PROFESSIONAL MISSIONS & PROGRESSION SYSTEM
    File: missions.js
-   Stage: 17
+   Stage: 17+
 
+   ============================================================
    مسئولیت‌های این فایل:
+   ============================================================
+
    - سیستم مأموریت‌های روزانه
    - سیستم مأموریت‌های هفتگی
-   - مدیریت پیشرفت مأموریت‌ها
-   - تکمیل مأموریت‌ها
+   - سیستم مأموریت‌های ماهانه
+   - سیستم درخت پیشرفت مأموریت‌ها
+   - شاخه‌های مأموریت
+   - Tier / Stage مأموریت‌ها
+   - وابستگی بین مأموریت‌ها
+   - باز شدن مرحله‌ای مأموریت‌ها
+   - مدیریت پیشرفت
+   - تکمیل مأموریت
    - دریافت پاداش
-   - ذخیره‌سازی مأموریت‌ها
+   - سکه
+   - XP
    - ریست روزانه
    - ریست هفتگی
-   - هماهنگی با UI
+   - ریست ماهانه
+   - ذخیره‌سازی LocalStorage
+   - مهاجرت اطلاعات نسخه‌های قبلی
    - رویدادهای مأموریت
-   - آماده‌سازی برای اتصال به Backend در مراحل بعدی
+   - هماهنگی با UI
+   - هماهنگی با Wallet
+   - هماهنگی با Profile
+   - هماهنگی با Game
+   - آماده‌سازی برای Backend
+   - آماده‌سازی برای Mission Tree UI
 
-   نکته:
-   این فایل به صورت مستقل نوشته شده و هیچ قابلیت
-   قبلی پروژه را حذف نمی‌کند.
-============================================================ */
+   ============================================================
+   قانون مهم:
+   ============================================================
+
+   این فایل هیچ قابلیت قبلی سیستم مأموریت را حذف نمی‌کند.
+
+   APIهای قبلی حفظ شده‌اند:
+
+   HokmMissions.initialize()
+   HokmMissions.getState()
+   HokmMissions.getAll()
+   HokmMissions.getDaily()
+   HokmMissions.getWeekly()
+   HokmMissions.getCompleted()
+   HokmMissions.getClaimable()
+   HokmMissions.find()
+   HokmMissions.getProgress()
+   HokmMissions.update()
+   HokmMissions.updateByType()
+   HokmMissions.complete()
+   HokmMissions.claimReward()
+   HokmMissions.render()
+   HokmMissions.reset()
+   HokmMissions.types
+   HokmMissions.categories
+
+   ============================================================ */
 
 
 /* ============================================================
@@ -31,24 +71,40 @@ window.HokmMissions = window.HokmMissions || {};
 
 
 /* ============================================================
-   2. CONSTANTS
+   2. STORAGE
 ============================================================ */
 
-const MISSIONS_STORAGE_KEY = "hokm_missions_v1";
+const MISSIONS_STORAGE_KEY = "hokm_missions_v2";
 
-const MISSION_VERSION = 1;
+const OLD_MISSIONS_STORAGE_KEY = "hokm_missions_v1";
+
+const MISSION_VERSION = 2;
+
+
+/* ============================================================
+   3. RESET SETTINGS
+============================================================ */
 
 const DAILY_MISSION_RESET_HOUR = 0;
 
-const WEEKLY_MISSION_RESET_DAY = 6;
+const WEEKLY_MISSION_RESET_DAY = 1;
+
+const MONTHLY_MISSION_RESET_DAY = 1;
+
+
+/* ============================================================
+   4. LIMITS
+============================================================ */
 
 const MAX_DAILY_MISSIONS = 5;
 
 const MAX_WEEKLY_MISSIONS = 5;
 
+const MAX_MONTHLY_MISSIONS = 7;
+
 
 /* ============================================================
-   3. MISSION TYPES
+   5. MISSION TYPES
 ============================================================ */
 
 const MISSION_TYPES = {
@@ -85,264 +141,1178 @@ const MISSION_TYPES = {
 
     LOGIN: "login",
 
-    SEND_MESSAGES: "send_messages"
+    SEND_MESSAGES: "send_messages",
+
+    WIN_STREAK: "win_streak",
+
+    PERFECT_GAME: "perfect_game",
+
+    PLAY_CONSECUTIVE_DAYS: "play_consecutive_days",
+
+    EARN_REWARDS: "earn_rewards",
+
+    COMPLETE_MISSIONS: "complete_missions"
 
 };
 
 
 /* ============================================================
-   4. MISSION CATEGORIES
+   6. MISSION CATEGORIES
 ============================================================ */
 
 const MISSION_CATEGORIES = {
 
     DAILY: "daily",
 
-    WEEKLY: "weekly"
+    WEEKLY: "weekly",
+
+    MONTHLY: "monthly",
+
+    TREE: "tree"
 
 };
 
 
 /* ============================================================
-   5. DEFAULT MISSION DEFINITIONS
+   7. MISSION STATUS
+============================================================ */
+
+const MISSION_STATUS = {
+
+    LOCKED: "locked",
+
+    AVAILABLE: "available",
+
+    IN_PROGRESS: "in_progress",
+
+    COMPLETED: "completed",
+
+    CLAIMED: "claimed"
+
+
+};
+
+
+/* ============================================================
+   8. TREE BRANCHES
+============================================================ */
+
+const MISSION_BRANCHES = {
+
+    BEGINNER: {
+
+        id: "beginner",
+
+        title: "شروع مسیر",
+
+        description: "مسیر آشنایی و شروع پیشرفت در حکم",
+
+        icon: "🌱",
+
+        color: "green"
+
+    },
+
+    PLAY: {
+
+        id: "play",
+
+        title: "بازی و تجربه",
+
+        description: "با انجام بازی‌های بیشتر مهارت خود را افزایش بده",
+
+        icon: "🃏",
+
+        color: "blue"
+
+    },
+
+    WIN: {
+
+        id: "win",
+
+        title: "مسیر پیروزی",
+
+        description: "روی بردهای بیشتر تمرکز کن",
+
+        icon: "🏆",
+
+        color: "gold"
+
+    },
+
+    RANKED: {
+
+        id: "ranked",
+
+        title: "رقابتی",
+
+        description: "وارد رقابت حرفه‌ای شو",
+
+        icon: "👑",
+
+        color: "purple"
+
+    },
+
+    FRIENDS: {
+
+        id: "friends",
+
+        title: "دوستان",
+
+        description: "با دوستانت بازی کن",
+
+        icon: "👥",
+
+        color: "cyan"
+
+    },
+
+    MASTER: {
+
+        id: "master",
+
+        title: "استاد حکم",
+
+        description: "مسیر پیشرفته برای بازیکنان حرفه‌ای",
+
+        icon: "💎",
+
+        color: "red"
+
+    }
+
+};
+
+
+/* ============================================================
+   9. TREE TIERS
+============================================================ */
+
+const MISSION_TIERS = {
+
+    TIER_1: {
+
+        id: 1,
+
+        title: "شروع",
+
+        icon: "🌱"
+
+    },
+
+    TIER_2: {
+
+        id: 2,
+
+        title: "تازه‌کار",
+
+        icon: "⭐"
+
+    },
+
+    TIER_3: {
+
+        id: 3,
+
+        title: "ماهر",
+
+        icon: "🔥"
+
+    },
+
+    TIER_4: {
+
+        id: 4,
+
+        title: "حرفه‌ای",
+
+        icon: "🏆"
+
+    },
+
+    TIER_5: {
+
+        id: 5,
+
+        title: "استاد",
+
+        icon: "👑"
+
+    }
+
+};
+
+
+/* ============================================================
+   10. DAILY MISSION DEFINITIONS
 ============================================================ */
 
 const DAILY_MISSION_DEFINITIONS = [
 
     {
-        id: "daily_play_1",
-        type: MISSION_TYPES.PLAY_GAMES,
-        title: "یک بازی حکم انجام بده",
-        description: "یک بازی حکم را کامل کن.",
-        target: 1,
-        rewardCoins: 100,
-        rewardXP: 25,
-        icon: "🃏"
-    },
 
-    {
-        id: "daily_play_3",
-        type: MISSION_TYPES.PLAY_GAMES,
-        title: "سه بازی انجام بده",
-        description: "سه بازی حکم را کامل کن.",
-        target: 3,
-        rewardCoins: 250,
-        rewardXP: 60,
-        icon: "🎮"
-    },
-
-    {
-        id: "daily_win_1",
-        type: MISSION_TYPES.WIN_GAMES,
-        title: "یک پیروزی کسب کن",
-        description: "در یک بازی حکم پیروز شو.",
-        target: 1,
-        rewardCoins: 150,
-        rewardXP: 40,
-        icon: "🏆"
-    },
-
-    {
-        id: "daily_win_2",
-        type: MISSION_TYPES.WIN_GAMES,
-        title: "دو پیروزی کسب کن",
-        description: "دو بازی حکم را با پیروزی به پایان برسان.",
-        target: 2,
-        rewardCoins: 300,
-        rewardXP: 80,
-        icon: "🥇"
-    },
-
-    {
-        id: "daily_tricks_5",
-        type: MISSION_TYPES.WIN_TRICKS,
-        title: "پنج دست ببر",
-        description: "در مجموع پنج دست را برنده شو.",
-        target: 5,
-        rewardCoins: 200,
-        rewardXP: 50,
-        icon: "♠️"
-    },
-
-    {
-        id: "daily_tricks_10",
-        type: MISSION_TYPES.WIN_TRICKS,
-        title: "ده دست ببر",
-        description: "در مجموع ده دست را برنده شو.",
-        target: 10,
-        rewardCoins: 350,
-        rewardXP: 90,
-        icon: "🃏"
-    },
-
-    {
-        id: "daily_coins_500",
-        type: MISSION_TYPES.EARN_COINS,
-        title: "۵۰۰ سکه به دست بیاور",
-        description: "در مجموع ۵۰۰ سکه کسب کن.",
-        target: 500,
-        rewardCoins: 150,
-        rewardXP: 40,
-        icon: "🪙"
-    },
-
-    {
-        id: "daily_ranked_1",
-        type: MISSION_TYPES.PLAY_RANKED,
-        title: "یک بازی رقابتی انجام بده",
-        description: "یک بازی در حالت رقابتی انجام بده.",
-        target: 1,
-        rewardCoins: 200,
-        rewardXP: 60,
-        icon: "🏆"
-    },
-
-    {
-        id: "daily_friend_game",
-        type: MISSION_TYPES.PLAY_WITH_FRIEND,
-        title: "با یک دوست بازی کن",
-        description: "با یکی از دوستانت یک بازی انجام بده.",
-        target: 1,
-        rewardCoins: 250,
-        rewardXP: 70,
-        icon: "👥"
-    },
-
-    {
         id: "daily_login",
+
         type: MISSION_TYPES.LOGIN,
+
         title: "ورود روزانه",
+
         description: "امروز وارد بازی شو.",
+
         target: 1,
+
         rewardCoins: 50,
+
         rewardXP: 10,
-        icon: "📅"
+
+        icon: "📅",
+
+        branch: "beginner",
+
+        tier: 1
+
+    },
+
+    {
+
+        id: "daily_play_1",
+
+        type: MISSION_TYPES.PLAY_GAMES,
+
+        title: "یک بازی حکم انجام بده",
+
+        description: "یک بازی حکم را کامل کن.",
+
+        target: 1,
+
+        rewardCoins: 100,
+
+        rewardXP: 25,
+
+        icon: "🃏",
+
+        branch: "play",
+
+        tier: 1
+
+    },
+
+    {
+
+        id: "daily_play_3",
+
+        type: MISSION_TYPES.PLAY_GAMES,
+
+        title: "سه بازی انجام بده",
+
+        description: "سه بازی حکم را کامل کن.",
+
+        target: 3,
+
+        rewardCoins: 250,
+
+        rewardXP: 60,
+
+        icon: "🎮",
+
+        branch: "play",
+
+        tier: 2
+
+    },
+
+    {
+
+        id: "daily_win_1",
+
+        type: MISSION_TYPES.WIN_GAMES,
+
+        title: "یک پیروزی کسب کن",
+
+        description: "در یک بازی حکم پیروز شو.",
+
+        target: 1,
+
+        rewardCoins: 150,
+
+        rewardXP: 40,
+
+        icon: "🏆",
+
+        branch: "win",
+
+        tier: 2
+
+    },
+
+    {
+
+        id: "daily_win_2",
+
+        type: MISSION_TYPES.WIN_GAMES,
+
+        title: "دو پیروزی کسب کن",
+
+        description: "دو بازی حکم را با پیروزی به پایان برسان.",
+
+        target: 2,
+
+        rewardCoins: 300,
+
+        rewardXP: 80,
+
+        icon: "🥇",
+
+        branch: "win",
+
+        tier: 3
+
+    },
+
+    {
+
+        id: "daily_tricks_5",
+
+        type: MISSION_TYPES.WIN_TRICKS,
+
+        title: "پنج دست ببر",
+
+        description: "در مجموع پنج دست را برنده شو.",
+
+        target: 5,
+
+        rewardCoins: 200,
+
+        rewardXP: 50,
+
+        icon: "♠️",
+
+        branch: "win",
+
+        tier: 2
+
+    },
+
+    {
+
+        id: "daily_tricks_10",
+
+        type: MISSION_TYPES.WIN_TRICKS,
+
+        title: "ده دست ببر",
+
+        description: "در مجموع ده دست را برنده شو.",
+
+        target: 10,
+
+        rewardCoins: 350,
+
+        rewardXP: 90,
+
+        icon: "🃏",
+
+        branch: "win",
+
+        tier: 3
+
+    },
+
+    {
+
+        id: "daily_coins_500",
+
+        type: MISSION_TYPES.EARN_COINS,
+
+        title: "۵۰۰ سکه به دست بیاور",
+
+        description: "در مجموع ۵۰۰ سکه کسب کن.",
+
+        target: 500,
+
+        rewardCoins: 150,
+
+        rewardXP: 40,
+
+        icon: "🪙",
+
+        branch: "play",
+
+        tier: 2
+
+    },
+
+    {
+
+        id: "daily_ranked_1",
+
+        type: MISSION_TYPES.PLAY_RANKED,
+
+        title: "یک بازی رقابتی انجام بده",
+
+        description: "یک بازی در حالت رقابتی انجام بده.",
+
+        target: 1,
+
+        rewardCoins: 200,
+
+        rewardXP: 60,
+
+        icon: "🏆",
+
+        branch: "ranked",
+
+        tier: 3
+
+    },
+
+    {
+
+        id: "daily_friend_game",
+
+        type: MISSION_TYPES.PLAY_WITH_FRIEND,
+
+        title: "با یک دوست بازی کن",
+
+        description: "با یکی از دوستانت یک بازی انجام بده.",
+
+        target: 1,
+
+        rewardCoins: 250,
+
+        rewardXP: 70,
+
+        icon: "👥",
+
+        branch: "friends",
+
+        tier: 2
+
     }
 
 ];
 
 
 /* ============================================================
-   6. WEEKLY MISSION DEFINITIONS
+   11. WEEKLY MISSION DEFINITIONS
 ============================================================ */
 
 const WEEKLY_MISSION_DEFINITIONS = [
 
     {
+
         id: "weekly_play_10",
+
         type: MISSION_TYPES.PLAY_GAMES,
+
         title: "ده بازی انجام بده",
+
         description: "در طول هفته ده بازی حکم انجام بده.",
+
         target: 10,
+
         rewardCoins: 800,
+
         rewardXP: 250,
-        icon: "🎮"
+
+        icon: "🎮",
+
+        branch: "play",
+
+        tier: 2
+
     },
 
     {
+
         id: "weekly_play_25",
+
         type: MISSION_TYPES.PLAY_GAMES,
+
         title: "بیست و پنج بازی انجام بده",
+
         description: "در طول هفته بیست و پنج بازی انجام بده.",
+
         target: 25,
+
         rewardCoins: 1800,
+
         rewardXP: 500,
-        icon: "🔥"
+
+        icon: "🔥",
+
+        branch: "play",
+
+        tier: 3
+
     },
 
     {
+
         id: "weekly_win_10",
+
         type: MISSION_TYPES.WIN_GAMES,
+
         title: "ده پیروزی",
+
         description: "در طول هفته ده بازی را ببر.",
+
         target: 10,
+
         rewardCoins: 1500,
+
         rewardXP: 450,
-        icon: "🏆"
+
+        icon: "🏆",
+
+        branch: "win",
+
+        tier: 3
+
     },
 
     {
+
         id: "weekly_win_20",
+
         type: MISSION_TYPES.WIN_GAMES,
+
         title: "بیست پیروزی",
+
         description: "در طول هفته بیست بازی را ببر.",
+
         target: 20,
+
         rewardCoins: 3000,
+
         rewardXP: 800,
-        icon: "👑"
+
+        icon: "👑",
+
+        branch: "win",
+
+        tier: 4
+
     },
 
     {
+
         id: "weekly_tricks_50",
+
         type: MISSION_TYPES.WIN_TRICKS,
+
         title: "پنجاه دست پیروز شو",
+
         description: "در طول هفته پنجاه دست را برنده شو.",
+
         target: 50,
+
         rewardCoins: 1200,
+
         rewardXP: 350,
-        icon: "♠️"
+
+        icon: "♠️",
+
+        branch: "win",
+
+        tier: 3
+
     },
 
     {
+
         id: "weekly_tricks_100",
+
         type: MISSION_TYPES.WIN_TRICKS,
+
         title: "صد دست پیروز شو",
+
         description: "در طول هفته صد دست را برنده شو.",
+
         target: 100,
+
         rewardCoins: 2500,
+
         rewardXP: 700,
-        icon: "💎"
+
+        icon: "💎",
+
+        branch: "master",
+
+        tier: 4
+
     },
 
     {
+
         id: "weekly_ranked_10",
+
         type: MISSION_TYPES.PLAY_RANKED,
+
         title: "ده بازی رقابتی",
+
         description: "ده بازی رقابتی انجام بده.",
+
         target: 10,
+
         rewardCoins: 1200,
+
         rewardXP: 400,
-        icon: "🏅"
+
+        icon: "🏅",
+
+        branch: "ranked",
+
+        tier: 3
+
     },
 
     {
+
         id: "weekly_ranked_win_5",
+
         type: MISSION_TYPES.WIN_RANKED,
+
         title: "پنج برد رقابتی",
+
         description: "پنج بازی رقابتی را ببر.",
+
         target: 5,
+
         rewardCoins: 1800,
+
         rewardXP: 600,
-        icon: "👑"
+
+        icon: "👑",
+
+        branch: "ranked",
+
+        tier: 4
+
     },
 
     {
+
         id: "weekly_coins_5000",
+
         type: MISSION_TYPES.EARN_COINS,
+
         title: "۵۰۰۰ سکه کسب کن",
+
         description: "در طول هفته ۵۰۰۰ سکه کسب کن.",
+
         target: 5000,
+
         rewardCoins: 1000,
+
         rewardXP: 300,
-        icon: "🪙"
+
+        icon: "🪙",
+
+        branch: "play",
+
+        tier: 3
+
     },
 
     {
+
         id: "weekly_friend_5",
+
         type: MISSION_TYPES.PLAY_WITH_FRIEND,
+
         title: "با دوستانت بازی کن",
+
         description: "با دوستانت پنج بازی انجام بده.",
+
         target: 5,
+
         rewardCoins: 1000,
+
         rewardXP: 350,
-        icon: "👥"
+
+        icon: "👥",
+
+        branch: "friends",
+
+        tier: 3
+
     }
 
 ];
 
 
 /* ============================================================
-   7. INTERNAL STATE
+   12. MONTHLY MISSION DEFINITIONS
+============================================================ */
+
+const MONTHLY_MISSION_DEFINITIONS = [
+
+    {
+
+        id: "monthly_play_50",
+
+        type: MISSION_TYPES.PLAY_GAMES,
+
+        title: "۵۰ بازی در ماه",
+
+        description: "در طول این ماه ۵۰ بازی حکم انجام بده.",
+
+        target: 50,
+
+        rewardCoins: 5000,
+
+        rewardXP: 1500,
+
+        icon: "🎮",
+
+        branch: "play",
+
+        tier: 3
+
+    },
+
+    {
+
+        id: "monthly_play_100",
+
+        type: MISSION_TYPES.PLAY_GAMES,
+
+        title: "۱۰۰ بازی در ماه",
+
+        description: "در طول این ماه ۱۰۰ بازی حکم انجام بده.",
+
+        target: 100,
+
+        rewardCoins: 10000,
+
+        rewardXP: 3000,
+
+        icon: "🔥",
+
+        branch: "play",
+
+        tier: 4
+
+    },
+
+    {
+
+        id: "monthly_win_50",
+
+        type: MISSION_TYPES.WIN_GAMES,
+
+        title: "۵۰ پیروزی در ماه",
+
+        description: "در طول این ماه ۵۰ بازی را ببر.",
+
+        target: 50,
+
+        rewardCoins: 8000,
+
+        rewardXP: 2500,
+
+        icon: "🏆",
+
+        branch: "win",
+
+        tier: 4
+
+    },
+
+    {
+
+        id: "monthly_ranked_25",
+
+        type: MISSION_TYPES.PLAY_RANKED,
+
+        title: "۲۵ بازی رقابتی",
+
+        description: "در طول این ماه ۲۵ بازی رقابتی انجام بده.",
+
+        target: 25,
+
+        rewardCoins: 6000,
+
+        rewardXP: 2000,
+
+        icon: "🏅",
+
+        branch: "ranked",
+
+        tier: 4
+
+    },
+
+    {
+
+        id: "monthly_ranked_win_15",
+
+        type: MISSION_TYPES.WIN_RANKED,
+
+        title: "۱۵ برد رقابتی",
+
+        description: "در طول این ماه ۱۵ بازی رقابتی را ببر.",
+
+        target: 15,
+
+        rewardCoins: 10000,
+
+        rewardXP: 3500,
+
+        icon: "👑",
+
+        branch: "ranked",
+
+        tier: 5
+
+    },
+
+    {
+
+        id: "monthly_friend_20",
+
+        type: MISSION_TYPES.PLAY_WITH_FRIEND,
+
+        title: "۲۰ بازی با دوستان",
+
+        description: "در طول این ماه ۲۰ بازی با دوستانت انجام بده.",
+
+        target: 20,
+
+        rewardCoins: 5000,
+
+        rewardXP: 1800,
+
+        icon: "👥",
+
+        branch: "friends",
+
+        tier: 4
+
+    },
+
+    {
+
+        id: "monthly_tricks_500",
+
+        type: MISSION_TYPES.WIN_TRICKS,
+
+        title: "۵۰۰ دست پیروز شو",
+
+        description: "در طول این ماه ۵۰۰ دست را برنده شو.",
+
+        target: 500,
+
+        rewardCoins: 12000,
+
+        rewardXP: 4000,
+
+        icon: "💎",
+
+        branch: "master",
+
+        tier: 5
+
+    },
+
+    {
+
+        id: "monthly_coins_25000",
+
+        type: MISSION_TYPES.EARN_COINS,
+
+        title: "۲۵۰۰۰ سکه کسب کن",
+
+        description: "در طول این ماه ۲۵۰۰۰ سکه به دست بیاور.",
+
+        target: 25000,
+
+        rewardCoins: 7500,
+
+        rewardXP: 2500,
+
+        icon: "🪙",
+
+        branch: "master",
+
+        tier: 5
+
+    }
+
+];
+
+
+/* ============================================================
+   13. PERMANENT TREE DEFINITIONS
+============================================================ */
+
+const MISSION_TREE_DEFINITIONS = [
+
+    {
+
+        id: "tree_start",
+
+        branch: "beginner",
+
+        tier: 1,
+
+        order: 1,
+
+        type: MISSION_TYPES.LOGIN,
+
+        title: "شروع سفر",
+
+        description: "اولین قدم را در مسیر پیشرفت بردار.",
+
+        target: 1,
+
+        rewardCoins: 100,
+
+        rewardXP: 25,
+
+        icon: "🌱",
+
+        prerequisites: []
+
+    },
+
+    {
+
+        id: "tree_first_game",
+
+        branch: "play",
+
+        tier: 1,
+
+        order: 2,
+
+        type: MISSION_TYPES.PLAY_GAMES,
+
+        title: "اولین بازی",
+
+        description: "اولین بازی کامل خود را انجام بده.",
+
+        target: 1,
+
+        rewardCoins: 200,
+
+        rewardXP: 50,
+
+        icon: "🃏",
+
+        prerequisites: [
+
+            "tree_start"
+
+        ]
+
+    },
+
+    {
+
+        id: "tree_five_games",
+
+        branch: "play",
+
+        tier: 2,
+
+        order: 3,
+
+        type: MISSION_TYPES.PLAY_GAMES,
+
+        title: "پنج بازی",
+
+        description: "پنج بازی کامل انجام بده.",
+
+        target: 5,
+
+        rewardCoins: 500,
+
+        rewardXP: 150,
+
+        icon: "🎮",
+
+        prerequisites: [
+
+            "tree_first_game"
+
+        ]
+
+    },
+
+    {
+
+        id: "tree_first_win",
+
+        branch: "win",
+
+        tier: 2,
+
+        order: 4,
+
+        type: MISSION_TYPES.WIN_GAMES,
+
+        title: "اولین پیروزی",
+
+        description: "اولین برد خود را ثبت کن.",
+
+        target: 1,
+
+        rewardCoins: 500,
+
+        rewardXP: 150,
+
+        icon: "🏆",
+
+        prerequisites: [
+
+            "tree_first_game"
+
+        ]
+
+    },
+
+    {
+
+        id: "tree_ten_wins",
+
+        branch: "win",
+
+        tier: 3,
+
+        order: 5,
+
+        type: MISSION_TYPES.WIN_GAMES,
+
+        title: "ده پیروزی",
+
+        description: "۱۰ بازی را با پیروزی به پایان برسان.",
+
+        target: 10,
+
+        rewardCoins: 1500,
+
+        rewardXP: 500,
+
+        icon: "🥇",
+
+        prerequisites: [
+
+            "tree_first_win",
+
+            "tree_five_games"
+
+        ]
+
+    },
+
+    {
+
+        id: "tree_ranked_start",
+
+        branch: "ranked",
+
+        tier: 3,
+
+        order: 6,
+
+        type: MISSION_TYPES.PLAY_RANKED,
+
+        title: "ورود به رقابت",
+
+        description: "اولین بازی رقابتی خود را انجام بده.",
+
+        target: 1,
+
+        rewardCoins: 750,
+
+        rewardXP: 250,
+
+        icon: "🏅",
+
+        prerequisites: [
+
+            "tree_first_win"
+
+        ]
+
+    },
+
+    {
+
+        id: "tree_ranked_wins",
+
+        branch: "ranked",
+
+        tier: 4,
+
+        order: 7,
+
+        type: MISSION_TYPES.WIN_RANKED,
+
+        title: "سلطه در رقابت",
+
+        description: "۱۰ بازی رقابتی را ببر.",
+
+        target: 10,
+
+        rewardCoins: 3000,
+
+        rewardXP: 1000,
+
+        icon: "👑",
+
+        prerequisites: [
+
+            "tree_ranked_start",
+
+            "tree_ten_wins"
+
+        ]
+
+    },
+
+    {
+
+        id: "tree_master",
+
+        branch: "master",
+
+        tier: 5,
+
+        order: 8,
+
+        type: MISSION_TYPES.WIN_GAMES,
+
+        title: "استاد حکم",
+
+        description: "مسیر اصلی پیشرفت را کامل کن.",
+
+        target: 50,
+
+        rewardCoins: 10000,
+
+        rewardXP: 5000,
+
+        icon: "💎",
+
+        prerequisites: [
+
+            "tree_ranked_wins",
+
+            "tree_ten_wins"
+
+        ]
+
+    }
+
+];
+
+
+/* ============================================================
+   14. INTERNAL STATE
 ============================================================ */
 
 let missionsState = {
@@ -353,9 +1323,15 @@ let missionsState = {
 
     weekly: [],
 
+    monthly: [],
+
+    tree: [],
+
     lastDailyReset: null,
 
     lastWeeklyReset: null,
+
+    lastMonthlyReset: null,
 
     initialized: false
 
@@ -363,7 +1339,16 @@ let missionsState = {
 
 
 /* ============================================================
-   8. UTILITY FUNCTIONS
+   15. INTERNAL FLAGS
+============================================================ */
+
+let missionsDOMEventsInitialized = false;
+
+let missionsGameEventsInitialized = false;
+
+
+/* ============================================================
+   16. DATE UTILS
 ============================================================ */
 
 function missionNow() {
@@ -394,22 +1379,39 @@ function missionWeekKey(date = missionNow()) {
 
     const day = current.getDay();
 
-    const diff = current.getDate() - day + 1;
+    const diff = day === 0
 
-    const firstDay = new Date(
+        ? -6
 
-        current.getFullYear(),
+        : 1 - day;
 
-        current.getMonth(),
+    const monday = new Date(current);
 
-        diff
+    monday.setDate(current.getDate() + diff);
 
-    );
+    monday.setHours(0, 0, 0, 0);
 
-    return missionDateKey(firstDay);
+    return missionDateKey(monday);
 
 }
 
+
+function missionMonthKey(date = missionNow()) {
+
+    return [
+
+        date.getFullYear(),
+
+        String(date.getMonth() + 1).padStart(2, "0")
+
+    ].join("-");
+
+}
+
+
+/* ============================================================
+   17. GENERIC UTILS
+============================================================ */
 
 function clampMissionProgress(value, target) {
 
@@ -421,18 +1423,51 @@ function clampMissionProgress(value, target) {
 
         0,
 
-        Math.min(numericValue, numericTarget)
+        Math.min(
+
+            numericValue,
+
+            numericTarget
+
+        )
 
     );
 
 }
 
 
+function cloneMissionData(value) {
+
+    try {
+
+        return JSON.parse(
+
+            JSON.stringify(value)
+
+        );
+
+    } catch (error) {
+
+        return value;
+
+    }
+
+}
+
+
 /* ============================================================
-   9. CREATE MISSION INSTANCE
+   18. CREATE MISSION INSTANCE
 ============================================================ */
 
-function createMissionInstance(definition, category) {
+function createMissionInstance(
+
+    definition,
+
+    category,
+
+    extra = {}
+
+) {
 
     return {
 
@@ -442,29 +1477,79 @@ function createMissionInstance(definition, category) {
 
         category: category,
 
+        branch: definition.branch || "beginner",
+
+        tier: definition.tier || 1,
+
+        order: definition.order || 0,
+
         title: definition.title,
 
         description: definition.description,
 
-        target: definition.target,
+        target: Number(definition.target) || 1,
 
-        progress: 0,
+        progress: Number(extra.progress) || 0,
 
-        rewardCoins: definition.rewardCoins,
+        rewardCoins: Number(definition.rewardCoins) || 0,
 
-        rewardXP: definition.rewardXP,
+        rewardXP: Number(definition.rewardXP) || 0,
 
-        icon: definition.icon,
+        icon: definition.icon || "🎯",
 
-        completed: false,
+        prerequisites: Array.isArray(
 
-        claimed: false,
+            definition.prerequisites
 
-        createdAt: Date.now(),
+        )
 
-        completedAt: null,
+            ? [...definition.prerequisites]
 
-        claimedAt: null
+            : [],
+
+        completed:
+
+            extra.completed === true,
+
+        claimed:
+
+            extra.claimed === true,
+
+        unlocked:
+
+            extra.unlocked !== false,
+
+        status:
+
+            extra.status ||
+
+            (
+
+                extra.unlocked === false
+
+                    ? MISSION_STATUS.LOCKED
+
+                    : MISSION_STATUS.AVAILABLE
+
+            ),
+
+        createdAt:
+
+            extra.createdAt ||
+
+            Date.now(),
+
+        completedAt:
+
+            extra.completedAt ||
+
+            null,
+
+        claimedAt:
+
+            extra.claimedAt ||
+
+            null
 
     };
 
@@ -472,61 +1557,7 @@ function createMissionInstance(definition, category) {
 
 
 /* ============================================================
-   10. SELECT MISSIONS
-============================================================ */
-
-function selectDailyMissions() {
-
-    const definitions = [...DAILY_MISSION_DEFINITIONS];
-
-    shuffleMissionArray(definitions);
-
-    return definitions
-
-        .slice(0, MAX_DAILY_MISSIONS)
-
-        .map(definition =>
-
-            createMissionInstance(
-
-                definition,
-
-                MISSION_CATEGORIES.DAILY
-
-            )
-
-        );
-
-}
-
-
-function selectWeeklyMissions() {
-
-    const definitions = [...WEEKLY_MISSION_DEFINITIONS];
-
-    shuffleMissionArray(definitions);
-
-    return definitions
-
-        .slice(0, MAX_WEEKLY_MISSIONS)
-
-        .map(definition =>
-
-            createMissionInstance(
-
-                definition,
-
-                MISSION_CATEGORIES.WEEKLY
-
-            )
-
-        );
-
-}
-
-
-/* ============================================================
-   11. SHUFFLE
+   19. SELECT RANDOM MISSIONS
 ============================================================ */
 
 function shuffleMissionArray(array) {
@@ -568,19 +1599,333 @@ function shuffleMissionArray(array) {
 }
 
 
+function selectMissionDefinitions(
+
+    definitions,
+
+    max
+
+) {
+
+    const list = [...definitions];
+
+    shuffleMissionArray(list);
+
+    return list.slice(
+
+        0,
+
+        Math.min(
+
+            max,
+
+            list.length
+
+        )
+
+    );
+
+}
+
+
 /* ============================================================
-   12. SAVE STATE
+   20. CREATE DAILY
+============================================================ */
+
+function selectDailyMissions() {
+
+    return selectMissionDefinitions(
+
+        DAILY_MISSION_DEFINITIONS,
+
+        MAX_DAILY_MISSIONS
+
+    ).map(
+
+        definition =>
+
+            createMissionInstance(
+
+                definition,
+
+                MISSION_CATEGORIES.DAILY
+
+            )
+
+    );
+
+}
+
+
+/* ============================================================
+   21. CREATE WEEKLY
+============================================================ */
+
+function selectWeeklyMissions() {
+
+    return selectMissionDefinitions(
+
+        WEEKLY_MISSION_DEFINITIONS,
+
+        MAX_WEEKLY_MISSIONS
+
+    ).map(
+
+        definition =>
+
+            createMissionInstance(
+
+                definition,
+
+                MISSION_CATEGORIES.WEEKLY
+
+            )
+
+    );
+
+}
+
+
+/* ============================================================
+   22. CREATE MONTHLY
+============================================================ */
+
+function selectMonthlyMissions() {
+
+    return selectMissionDefinitions(
+
+        MONTHLY_MISSION_DEFINITIONS,
+
+        MAX_MONTHLY_MISSIONS
+
+    ).map(
+
+        definition =>
+
+            createMissionInstance(
+
+                definition,
+
+                MISSION_CATEGORIES.MONTHLY
+
+            )
+
+    );
+
+}
+
+
+/* ============================================================
+   23. CREATE TREE
+============================================================ */
+
+function createMissionTree() {
+
+    const existingTree =
+
+        Array.isArray(missionsState.tree)
+
+            ? missionsState.tree
+
+            : [];
+
+    const existingMap = new Map();
+
+    existingTree.forEach(
+
+        mission => {
+
+            if (mission && mission.id) {
+
+                existingMap.set(
+
+                    mission.id,
+
+                    mission
+
+                );
+
+            }
+
+        }
+
+    );
+
+    const tree = MISSION_TREE_DEFINITIONS.map(
+
+        definition => {
+
+            const old =
+
+                existingMap.get(
+
+                    definition.id
+
+                );
+
+            return createMissionInstance(
+
+                definition,
+
+                MISSION_CATEGORIES.TREE,
+
+                old || {}
+
+            );
+
+        }
+
+    );
+
+    updateMissionTreeStatuses(tree);
+
+    return tree;
+
+}
+
+
+/* ============================================================
+   24. TREE STATUS
+============================================================ */
+
+function updateMissionTreeStatuses(
+
+    tree = missionsState.tree
+
+) {
+
+    if (!Array.isArray(tree)) {
+
+        return;
+
+    }
+
+    const map = new Map();
+
+    tree.forEach(
+
+        mission => {
+
+            map.set(
+
+                mission.id,
+
+                mission
+
+            );
+
+        }
+
+    );
+
+    tree.forEach(
+
+        mission => {
+
+            if (mission.claimed) {
+
+                mission.unlocked = true;
+
+                mission.status =
+
+                    MISSION_STATUS.CLAIMED;
+
+                return;
+
+            }
+
+            if (mission.completed) {
+
+                mission.unlocked = true;
+
+                mission.status =
+
+                    MISSION_STATUS.COMPLETED;
+
+                return;
+
+            }
+
+            const prerequisites =
+
+                Array.isArray(
+
+                    mission.prerequisites
+
+                )
+
+                    ? mission.prerequisites
+
+                    : [];
+
+            const unlocked =
+
+                prerequisites.length === 0 ||
+
+                prerequisites.every(
+
+                    prerequisiteId => {
+
+                        const prerequisite =
+
+                            map.get(
+
+                                prerequisiteId
+
+                            );
+
+                        return prerequisite &&
+
+                            prerequisite.claimed;
+
+                    }
+
+                );
+
+            mission.unlocked = unlocked;
+
+            mission.status = unlocked
+
+                ? (
+
+                    mission.progress > 0
+
+                        ? MISSION_STATUS.IN_PROGRESS
+
+                        : MISSION_STATUS.AVAILABLE
+
+                )
+
+                : MISSION_STATUS.LOCKED;
+
+        }
+
+    );
+
+}
+
+
+/* ============================================================
+   25. SAVE STATE
 ============================================================ */
 
 function saveMissionsState() {
 
     try {
 
+        missionsState.version =
+
+            MISSION_VERSION;
+
         localStorage.setItem(
 
             MISSIONS_STORAGE_KEY,
 
-            JSON.stringify(missionsState)
+            JSON.stringify(
+
+                missionsState
+
+            )
 
         );
 
@@ -604,18 +1949,20 @@ function saveMissionsState() {
 
 
 /* ============================================================
-   13. LOAD STATE
+   26. LOAD NEW STATE
 ============================================================ */
 
-function loadMissionsState() {
+function loadNewMissionState() {
 
     try {
 
-        const rawData = localStorage.getItem(
+        const rawData =
 
-            MISSIONS_STORAGE_KEY
+            localStorage.getItem(
 
-        );
+                MISSIONS_STORAGE_KEY
+
+            );
 
         if (!rawData) {
 
@@ -623,7 +1970,9 @@ function loadMissionsState() {
 
         }
 
-        const parsedData = JSON.parse(rawData);
+        const parsedData =
+
+            JSON.parse(rawData);
 
         if (!parsedData) {
 
@@ -635,7 +1984,11 @@ function loadMissionsState() {
 
             ...missionsState,
 
-            ...parsedData
+            ...parsedData,
+
+            version:
+
+                MISSION_VERSION
 
         };
 
@@ -645,7 +1998,7 @@ function loadMissionsState() {
 
         console.error(
 
-            "Mission state load error:",
+            "New mission state load error:",
 
             error
 
@@ -659,7 +2012,163 @@ function loadMissionsState() {
 
 
 /* ============================================================
-   14. INITIALIZE
+   27. MIGRATE OLD STATE
+============================================================ */
+
+function migrateOldMissionState() {
+
+    try {
+
+        const oldRaw =
+
+            localStorage.getItem(
+
+                OLD_MISSIONS_STORAGE_KEY
+
+            );
+
+        if (!oldRaw) {
+
+            return false;
+
+        }
+
+        const oldData =
+
+            JSON.parse(oldRaw);
+
+        if (!oldData) {
+
+            return false;
+
+        }
+
+        if (
+
+            Array.isArray(oldData.daily)
+
+        ) {
+
+            missionsState.daily =
+
+                oldData.daily;
+
+        }
+
+        if (
+
+            Array.isArray(oldData.weekly)
+
+        ) {
+
+            missionsState.weekly =
+
+                oldData.weekly;
+
+        }
+
+        missionsState.lastDailyReset =
+
+            oldData.lastDailyReset ||
+
+            null;
+
+        missionsState.lastWeeklyReset =
+
+            oldData.lastWeeklyReset ||
+
+            null;
+
+        missionsState.monthly = [];
+
+        missionsState.tree = [];
+
+        return true;
+
+    } catch (error) {
+
+        console.error(
+
+            "Mission migration error:",
+
+            error
+
+        );
+
+        return false;
+
+    }
+
+}
+
+
+/* ============================================================
+   28. NORMALIZE LOADED MISSIONS
+============================================================ */
+
+function normalizeMissionCollection(
+
+    collection,
+
+    category
+
+) {
+
+    if (!Array.isArray(collection)) {
+
+        return [];
+
+    }
+
+    return collection.map(
+
+        mission => ({
+
+            ...mission,
+
+            category:
+
+                mission.category ||
+
+                category,
+
+            progress:
+
+                Number(mission.progress) || 0,
+
+            target:
+
+                Number(mission.target) || 1,
+
+            rewardCoins:
+
+                Number(mission.rewardCoins) || 0,
+
+            rewardXP:
+
+                Number(mission.rewardXP) || 0,
+
+            completed:
+
+                mission.completed === true,
+
+            claimed:
+
+                mission.claimed === true,
+
+            unlocked:
+
+                mission.unlocked !== false
+
+        })
+
+    );
+
+}
+
+
+/* ============================================================
+   29. INITIALIZE
 ============================================================ */
 
 function initializeMissions() {
@@ -668,47 +2177,141 @@ function initializeMissions() {
 
         checkMissionResets();
 
+        updateMissionTreeStatuses();
+
+        renderAllMissions();
+
         return getMissionsState();
 
     }
 
-    loadMissionsState();
+    const loaded =
 
-    const today = missionDateKey();
+        loadNewMissionState();
 
-    const currentWeek = missionWeekKey();
+    if (!loaded) {
+
+        migrateOldMissionState();
+
+    }
+
+    const today =
+
+        missionDateKey();
+
+    const currentWeek =
+
+        missionWeekKey();
+
+    const currentMonth =
+
+        missionMonthKey();
+
+    missionsState.daily =
+
+        normalizeMissionCollection(
+
+            missionsState.daily,
+
+            MISSION_CATEGORIES.DAILY
+
+        );
+
+    missionsState.weekly =
+
+        normalizeMissionCollection(
+
+            missionsState.weekly,
+
+            MISSION_CATEGORIES.WEEKLY
+
+        );
+
+    missionsState.monthly =
+
+        normalizeMissionCollection(
+
+            missionsState.monthly,
+
+            MISSION_CATEGORIES.MONTHLY
+
+        );
 
     if (
-
-        !Array.isArray(missionsState.daily) ||
 
         missionsState.daily.length === 0
 
     ) {
 
-        missionsState.daily = selectDailyMissions();
+        missionsState.daily =
 
-        missionsState.lastDailyReset = today;
+            selectDailyMissions();
+
+        missionsState.lastDailyReset =
+
+            today;
 
     }
 
     if (
 
-        !Array.isArray(missionsState.weekly) ||
-
         missionsState.weekly.length === 0
 
     ) {
 
-        missionsState.weekly = selectWeeklyMissions();
+        missionsState.weekly =
 
-        missionsState.lastWeeklyReset = currentWeek;
+            selectWeeklyMissions();
+
+        missionsState.lastWeeklyReset =
+
+            currentWeek;
+
+    }
+
+    if (
+
+        missionsState.monthly.length === 0
+
+    ) {
+
+        missionsState.monthly =
+
+            selectMonthlyMissions();
+
+        missionsState.lastMonthlyReset =
+
+            currentMonth;
+
+    }
+
+    missionsState.tree =
+
+        normalizeMissionCollection(
+
+            missionsState.tree,
+
+            MISSION_CATEGORIES.TREE
+
+        );
+
+    if (
+
+        missionsState.tree.length === 0
+
+    ) {
+
+        missionsState.tree =
+
+            createMissionTree();
 
     }
 
     missionsState.initialized = true;
 
     checkMissionResets();
+
+    updateMissionTreeStatuses();
 
     saveMissionsState();
 
@@ -728,26 +2331,40 @@ function initializeMissions() {
 
 
 /* ============================================================
-   15. RESET CHECK
+   30. RESET CHECK
 ============================================================ */
 
 function checkMissionResets() {
 
-    const today = missionDateKey();
+    const today =
 
-    const currentWeek = missionWeekKey();
+        missionDateKey();
+
+    const currentWeek =
+
+        missionWeekKey();
+
+    const currentMonth =
+
+        missionMonthKey();
 
     let changed = false;
 
     if (
 
-        missionsState.lastDailyReset !== today
+        missionsState.lastDailyReset !==
+
+        today
 
     ) {
 
-        missionsState.daily = selectDailyMissions();
+        missionsState.daily =
 
-        missionsState.lastDailyReset = today;
+            selectDailyMissions();
+
+        missionsState.lastDailyReset =
+
+            today;
 
         changed = true;
 
@@ -763,13 +2380,19 @@ function checkMissionResets() {
 
     if (
 
-        missionsState.lastWeeklyReset !== currentWeek
+        missionsState.lastWeeklyReset !==
+
+        currentWeek
 
     ) {
 
-        missionsState.weekly = selectWeeklyMissions();
+        missionsState.weekly =
 
-        missionsState.lastWeeklyReset = currentWeek;
+            selectWeeklyMissions();
+
+        missionsState.lastWeeklyReset =
+
+            currentWeek;
 
         changed = true;
 
@@ -782,6 +2405,36 @@ function checkMissionResets() {
         );
 
     }
+
+    if (
+
+        missionsState.lastMonthlyReset !==
+
+        currentMonth
+
+    ) {
+
+        missionsState.monthly =
+
+            selectMonthlyMissions();
+
+        missionsState.lastMonthlyReset =
+
+            currentMonth;
+
+        changed = true;
+
+        dispatchMissionEvent(
+
+            "monthlyMissionsReset",
+
+            missionsState.monthly
+
+        );
+
+    }
+
+    updateMissionTreeStatuses();
 
     if (changed) {
 
@@ -797,14 +2450,14 @@ function checkMissionResets() {
 
 
 /* ============================================================
-   16. GET STATE
+   31. GET STATE
 ============================================================ */
 
 function getMissionsState() {
 
-    return JSON.parse(
+    return cloneMissionData(
 
-        JSON.stringify(missionsState)
+        missionsState
 
     );
 
@@ -812,7 +2465,7 @@ function getMissionsState() {
 
 
 /* ============================================================
-   17. GET ALL MISSIONS
+   32. GET ALL
 ============================================================ */
 
 function getAllMissions() {
@@ -821,7 +2474,11 @@ function getAllMissions() {
 
         ...missionsState.daily,
 
-        ...missionsState.weekly
+        ...missionsState.weekly,
+
+        ...missionsState.monthly,
+
+        ...missionsState.tree
 
     ];
 
@@ -829,14 +2486,35 @@ function getAllMissions() {
 
 
 /* ============================================================
-   18. FIND MISSION
+   33. GET TEMPORARY MISSIONS
+============================================================ */
+
+function getTemporaryMissions() {
+
+    return [
+
+        ...missionsState.daily,
+
+        ...missionsState.weekly,
+
+        ...missionsState.monthly
+
+    ];
+
+}
+
+
+/* ============================================================
+   34. FIND MISSION
 ============================================================ */
 
 function findMission(missionId) {
 
     return getAllMissions().find(
 
-        mission => mission.id === missionId
+        mission =>
+
+            mission.id === missionId
 
     ) || null;
 
@@ -844,7 +2522,28 @@ function findMission(missionId) {
 
 
 /* ============================================================
-   19. UPDATE MISSION
+   35. FIND TREE MISSION
+============================================================ */
+
+function findTreeMission(missionId) {
+
+    return (
+
+        missionsState.tree.find(
+
+            mission =>
+
+                mission.id === missionId
+
+        ) || null
+
+    );
+
+}
+
+
+/* ============================================================
+   36. UPDATE SINGLE MISSION
 ============================================================ */
 
 function updateMissionProgress(
@@ -855,7 +2554,9 @@ function updateMissionProgress(
 
 ) {
 
-    const mission = findMission(missionId);
+    const mission =
+
+        findMission(missionId);
 
     if (!mission) {
 
@@ -869,19 +2570,41 @@ function updateMissionProgress(
 
     }
 
-    const previousProgress = mission.progress;
+    if (
 
-    mission.progress = clampMissionProgress(
+        mission.category ===
 
-        mission.progress + Number(amount || 0),
+            MISSION_CATEGORIES.TREE &&
 
-        mission.target
+        mission.unlocked === false
 
-    );
+    ) {
+
+        return false;
+
+    }
+
+    const previousProgress =
+
+        mission.progress;
+
+    mission.progress =
+
+        clampMissionProgress(
+
+            mission.progress +
+
+            Number(amount || 0),
+
+            mission.target
+
+        );
 
     if (
 
-        mission.progress >= mission.target &&
+        mission.progress >=
+
+            mission.target &&
 
         !mission.completed
 
@@ -889,7 +2612,13 @@ function updateMissionProgress(
 
         mission.completed = true;
 
-        mission.completedAt = Date.now();
+        mission.status =
+
+            MISSION_STATUS.COMPLETED;
+
+        mission.completedAt =
+
+            Date.now();
 
         dispatchMissionEvent(
 
@@ -899,13 +2628,29 @@ function updateMissionProgress(
 
         );
 
+    } else if (
+
+        mission.progress >
+
+        0
+
+    ) {
+
+        mission.status =
+
+            MISSION_STATUS.IN_PROGRESS;
+
     }
 
     if (
 
-        previousProgress !== mission.progress
+        previousProgress !==
+
+        mission.progress
 
     ) {
+
+        updateMissionTreeStatuses();
 
         saveMissionsState();
 
@@ -927,7 +2672,7 @@ function updateMissionProgress(
 
 
 /* ============================================================
-   20. UPDATE BY TYPE
+   37. UPDATE BY TYPE
 ============================================================ */
 
 function updateMissionsByType(
@@ -940,81 +2685,143 @@ function updateMissionsByType(
 
 ) {
 
-    const missions = getAllMissions();
+    const missions =
+
+        getAllMissions();
 
     let updated = false;
 
-    missions.forEach(mission => {
+    missions.forEach(
 
-        if (mission.type !== type) {
+        mission => {
 
-            return;
+            if (
+
+                mission.type !== type
+
+            ) {
+
+                return;
+
+            }
+
+            if (
+
+                options.category &&
+
+                mission.category !==
+
+                    options.category
+
+            ) {
+
+                return;
+
+            }
+
+            if (mission.claimed) {
+
+                return;
+
+            }
+
+            if (
+
+                mission.category ===
+
+                    MISSION_CATEGORIES.TREE &&
+
+                mission.unlocked === false
+
+            ) {
+
+                return;
+
+            }
+
+            const before =
+
+                mission.progress;
+
+            mission.progress =
+
+                clampMissionProgress(
+
+                    mission.progress +
+
+                    Number(amount || 0),
+
+                    mission.target
+
+                );
+
+            if (
+
+                mission.progress >=
+
+                    mission.target &&
+
+                !mission.completed
+
+            ) {
+
+                mission.completed = true;
+
+                mission.status =
+
+                    MISSION_STATUS.COMPLETED;
+
+                mission.completedAt =
+
+                    Date.now();
+
+                dispatchMissionEvent(
+
+                    "missionCompleted",
+
+                    mission
+
+                );
+
+            } else if (
+
+                mission.progress > 0
+
+            ) {
+
+                mission.status =
+
+                    MISSION_STATUS.IN_PROGRESS;
+
+            }
+
+            if (
+
+                before !==
+
+                mission.progress
+
+            ) {
+
+                updated = true;
+
+                dispatchMissionEvent(
+
+                    "missionProgressUpdated",
+
+                    mission
+
+                );
+
+            }
 
         }
 
-        if (options.category &&
-
-            mission.category !== options.category) {
-
-            return;
-
-        }
-
-        if (mission.claimed) {
-
-            return;
-
-        }
-
-        const before = mission.progress;
-
-        mission.progress = clampMissionProgress(
-
-            mission.progress + Number(amount || 0),
-
-            mission.target
-
-        );
-
-        if (
-
-            mission.progress >= mission.target &&
-
-            !mission.completed
-
-        ) {
-
-            mission.completed = true;
-
-            mission.completedAt = Date.now();
-
-            dispatchMissionEvent(
-
-                "missionCompleted",
-
-                mission
-
-            );
-
-        }
-
-        if (before !== mission.progress) {
-
-            updated = true;
-
-            dispatchMissionEvent(
-
-                "missionProgressUpdated",
-
-                mission
-
-            );
-
-        }
-
-    });
+    );
 
     if (updated) {
+
+        updateMissionTreeStatuses();
 
         saveMissionsState();
 
@@ -1028,12 +2835,18 @@ function updateMissionsByType(
 
 
 /* ============================================================
-   21. CLAIM REWARD
+   38. CLAIM REWARD
 ============================================================ */
 
-function claimMissionReward(missionId) {
+function claimMissionReward(
 
-    const mission = findMission(missionId);
+    missionId
+
+) {
+
+    const mission =
+
+        findMission(missionId);
 
     if (!mission) {
 
@@ -1042,6 +2855,26 @@ function claimMissionReward(missionId) {
             success: false,
 
             reason: "MISSION_NOT_FOUND"
+
+        };
+
+    }
+
+    if (
+
+        mission.category ===
+
+            MISSION_CATEGORIES.TREE &&
+
+        mission.unlocked === false
+
+    ) {
+
+        return {
+
+            success: false,
+
+            reason: "MISSION_LOCKED"
 
         };
 
@@ -1073,17 +2906,37 @@ function claimMissionReward(missionId) {
 
     mission.claimed = true;
 
-    mission.claimedAt = Date.now();
+    mission.claimedAt =
+
+        Date.now();
+
+    mission.status =
+
+        MISSION_STATUS.CLAIMED;
 
     const reward = {
 
-        coins: Number(mission.rewardCoins) || 0,
+        coins:
 
-        xp: Number(mission.rewardXP) || 0
+            Number(
+
+                mission.rewardCoins
+
+            ) || 0,
+
+        xp:
+
+            Number(
+
+                mission.rewardXP
+
+            ) || 0
 
     };
 
     applyMissionReward(reward);
+
+    updateMissionTreeStatuses();
 
     saveMissionsState();
 
@@ -1123,20 +2976,30 @@ function claimMissionReward(missionId) {
 
 
 /* ============================================================
-   22. APPLY REWARD
+   39. APPLY REWARD
 ============================================================ */
 
-function applyMissionReward(reward) {
+function applyMissionReward(
 
-    const coins = Number(reward.coins) || 0;
+    reward
 
-    const xp = Number(reward.xp) || 0;
+) {
+
+    const coins =
+
+        Number(reward.coins) || 0;
+
+    const xp =
+
+        Number(reward.xp) || 0;
 
     if (
 
         window.HokmWallet &&
 
-        typeof window.HokmWallet.addCoins === "function"
+        typeof window.HokmWallet.addCoins ===
+
+            "function"
 
     ) {
 
@@ -1160,11 +3023,21 @@ function applyMissionReward(reward) {
 
             );
 
+            addCoinsFallback(
+
+                coins
+
+            );
+
         }
 
     } else {
 
-        addCoinsFallback(coins);
+        addCoinsFallback(
+
+            coins
+
+        );
 
     }
 
@@ -1172,7 +3045,9 @@ function applyMissionReward(reward) {
 
         window.HokmProfile &&
 
-        typeof window.HokmProfile.addXP === "function"
+        typeof window.HokmProfile.addXP ===
+
+            "function"
 
     ) {
 
@@ -1196,11 +3071,21 @@ function applyMissionReward(reward) {
 
             );
 
+            addXPFallback(
+
+                xp
+
+            );
+
         }
 
     } else {
 
-        addXPFallback(xp);
+        addXPFallback(
+
+            xp
+
+        );
 
     }
 
@@ -1208,10 +3093,14 @@ function applyMissionReward(reward) {
 
 
 /* ============================================================
-   23. FALLBACK COINS
+   40. FALLBACK COINS
 ============================================================ */
 
-function addCoinsFallback(amount) {
+function addCoinsFallback(
+
+    amount
+
+) {
 
     if (!amount) {
 
@@ -1221,21 +3110,27 @@ function addCoinsFallback(amount) {
 
     try {
 
-        const current = Number(
+        const current =
 
-            localStorage.getItem(
+            Number(
 
-                "hokm_coins"
+                localStorage.getItem(
 
-            )
+                    "hokm_coins"
 
-        ) || 0;
+                )
+
+            ) || 0;
 
         localStorage.setItem(
 
             "hokm_coins",
 
-            String(current + amount)
+            String(
+
+                current + amount
+
+            )
 
         );
 
@@ -1255,10 +3150,14 @@ function addCoinsFallback(amount) {
 
 
 /* ============================================================
-   24. FALLBACK XP
+   41. FALLBACK XP
 ============================================================ */
 
-function addXPFallback(amount) {
+function addXPFallback(
+
+    amount
+
+) {
 
     if (!amount) {
 
@@ -1268,21 +3167,27 @@ function addXPFallback(amount) {
 
     try {
 
-        const current = Number(
+        const current =
 
-            localStorage.getItem(
+            Number(
 
-                "hokm_xp"
+                localStorage.getItem(
 
-            )
+                    "hokm_xp"
 
-        ) || 0;
+                )
+
+            ) || 0;
 
         localStorage.setItem(
 
             "hokm_xp",
 
-            String(current + amount)
+            String(
+
+                current + amount
+
+            )
 
         );
 
@@ -1302,10 +3207,24 @@ function addXPFallback(amount) {
 
 
 /* ============================================================
-   25. GAME EVENTS
+   42. GAME EVENTS
 ============================================================ */
 
 function registerGameEvents() {
+
+    if (
+
+        missionsGameEventsInitialized
+
+    ) {
+
+        return;
+
+    }
+
+    missionsGameEventsInitialized =
+
+        true;
 
     window.addEventListener(
 
@@ -1313,7 +3232,9 @@ function registerGameEvents() {
 
         event => {
 
-            const data = event.detail || {};
+            const data =
+
+                event.detail || {};
 
             updateMissionsByType(
 
@@ -1331,7 +3252,11 @@ function registerGameEvents() {
 
             );
 
-            if (data.won === true) {
+            if (
+
+                data.won === true
+
+            ) {
 
                 updateMissionsByType(
 
@@ -1343,7 +3268,13 @@ function registerGameEvents() {
 
             }
 
-            if (data.mode === "ranked") {
+            if (
+
+                data.mode ===
+
+                    "ranked"
+
+            ) {
 
                 updateMissionsByType(
 
@@ -1353,7 +3284,11 @@ function registerGameEvents() {
 
                 );
 
-                if (data.won === true) {
+                if (
+
+                    data.won === true
+
+                ) {
 
                     updateMissionsByType(
 
@@ -1367,7 +3302,13 @@ function registerGameEvents() {
 
             }
 
-            if (data.mode === "practice") {
+            if (
+
+                data.mode ===
+
+                    "practice"
+
+            ) {
 
                 updateMissionsByType(
 
@@ -1379,7 +3320,13 @@ function registerGameEvents() {
 
             }
 
-            if (data.mode === "private") {
+            if (
+
+                data.mode ===
+
+                    "private"
+
+            ) {
 
                 updateMissionsByType(
 
@@ -1391,7 +3338,11 @@ function registerGameEvents() {
 
             }
 
-            if (data.withFriend === true) {
+            if (
+
+                data.withFriend === true
+
+            ) {
 
                 updateMissionsByType(
 
@@ -1407,27 +3358,31 @@ function registerGameEvents() {
 
     );
 
-
     window.addEventListener(
 
         "hokm:trickWon",
 
         event => {
 
-            const data = event.detail || {};
+            const data =
+
+                event.detail || {};
 
             updateMissionsByType(
 
                 MISSION_TYPES.WIN_TRICKS,
 
-                Number(data.count) || 1
+                Number(
+
+                    data.count
+
+                ) || 1
 
             );
 
         }
 
     );
-
 
     window.addEventListener(
 
@@ -1435,20 +3390,25 @@ function registerGameEvents() {
 
         event => {
 
-            const data = event.detail || {};
+            const data =
+
+                event.detail || {};
 
             updateMissionsByType(
 
                 MISSION_TYPES.EARN_COINS,
 
-                Number(data.amount) || 0
+                Number(
+
+                    data.amount
+
+                ) || 0
 
             );
 
         }
 
     );
-
 
     window.addEventListener(
 
@@ -1456,20 +3416,25 @@ function registerGameEvents() {
 
         event => {
 
-            const data = event.detail || {};
+            const data =
+
+                event.detail || {};
 
             updateMissionsByType(
 
                 MISSION_TYPES.EARN_XP,
 
-                Number(data.amount) || 0
+                Number(
+
+                    data.amount
+
+                ) || 0
 
             );
 
         }
 
     );
-
 
     window.addEventListener(
 
@@ -1488,7 +3453,6 @@ function registerGameEvents() {
         }
 
     );
-
 
     window.addEventListener(
 
@@ -1512,7 +3476,7 @@ function registerGameEvents() {
 
 
 /* ============================================================
-   26. DISPATCH EVENT
+   43. DISPATCH EVENT
 ============================================================ */
 
 function dispatchMissionEvent(
@@ -1557,7 +3521,7 @@ function dispatchMissionEvent(
 
 
 /* ============================================================
-   27. RENDER ALL
+   44. RENDER ALL
 ============================================================ */
 
 function renderAllMissions() {
@@ -1566,22 +3530,28 @@ function renderAllMissions() {
 
     renderWeeklyMissions();
 
+    renderMonthlyMissions();
+
+    renderMissionTree();
+
     updateHomeMissionWidget();
 
 }
 
 
 /* ============================================================
-   28. RENDER DAILY
+   45. RENDER DAILY
 ============================================================ */
 
 function renderDailyMissions() {
 
-    const container = document.getElementById(
+    const container =
 
-        "daily-missions"
+        document.getElementById(
 
-    );
+            "daily-missions"
+
+        );
 
     if (!container) {
 
@@ -1613,16 +3583,18 @@ function renderDailyMissions() {
 
 
 /* ============================================================
-   29. RENDER WEEKLY
+   46. RENDER WEEKLY
 ============================================================ */
 
 function renderWeeklyMissions() {
 
-    const container = document.getElementById(
+    const container =
 
-        "weekly-missions"
+        document.getElementById(
 
-    );
+            "weekly-missions"
+
+        );
 
     if (!container) {
 
@@ -1654,16 +3626,81 @@ function renderWeeklyMissions() {
 
 
 /* ============================================================
-   30. CREATE MISSION ELEMENT
+   47. RENDER MONTHLY
 ============================================================ */
 
-function createMissionElement(mission) {
+function renderMonthlyMissions() {
 
-    const wrapper = document.createElement("div");
+    const container =
 
-    wrapper.className = "mission-item";
+        document.getElementById(
 
-    wrapper.dataset.missionId = mission.id;
+            "monthly-missions"
+
+        );
+
+    if (!container) {
+
+        return;
+
+    }
+
+    container.innerHTML = "";
+
+    missionsState.monthly.forEach(
+
+        mission => {
+
+            container.appendChild(
+
+                createMissionElement(
+
+                    mission
+
+                )
+
+            );
+
+        }
+
+    );
+
+}
+
+
+/* ============================================================
+   48. CREATE NORMAL MISSION ELEMENT
+============================================================ */
+
+function createMissionElement(
+
+    mission
+
+) {
+
+    const wrapper =
+
+        document.createElement(
+
+            "div"
+
+        );
+
+    wrapper.className =
+
+        "mission-item";
+
+    wrapper.dataset.missionId =
+
+        mission.id;
+
+    wrapper.dataset.branch =
+
+        mission.branch || "";
+
+    wrapper.dataset.tier =
+
+        mission.tier || 1;
 
     if (mission.completed) {
 
@@ -1680,6 +3717,20 @@ function createMissionElement(mission) {
         wrapper.classList.add(
 
             "mission-claimed"
+
+        );
+
+    }
+
+    if (
+
+        mission.unlocked === false
+
+    ) {
+
+        wrapper.classList.add(
+
+            "mission-locked"
 
         );
 
@@ -1703,11 +3754,31 @@ function createMissionElement(mission) {
 
             : 0;
 
+    const safePercentage =
+
+        Math.max(
+
+            0,
+
+            Math.min(
+
+                100,
+
+                progressPercentage
+
+            )
+
+        );
+
     wrapper.innerHTML = `
 
         <div class="mission-item-icon">
 
-            ${escapeMissionHTML(mission.icon)}
+            ${escapeMissionHTML(
+
+                mission.icon
+
+            )}
 
         </div>
 
@@ -1717,7 +3788,11 @@ function createMissionElement(mission) {
 
                 <strong>
 
-                    ${escapeMissionHTML(mission.title)}
+                    ${escapeMissionHTML(
+
+                        mission.title
+
+                    )}
 
                 </strong>
 
@@ -1725,7 +3800,11 @@ function createMissionElement(mission) {
 
             <p>
 
-                ${escapeMissionHTML(mission.description)}
+                ${escapeMissionHTML(
+
+                    mission.description
+
+                )}
 
             </p>
 
@@ -1737,7 +3816,7 @@ function createMissionElement(mission) {
 
                         class="progress-fill"
 
-                        style="width: ${progressPercentage}%"
+                        style="width: ${safePercentage}%"
 
                     ></div>
 
@@ -1777,7 +3856,11 @@ function createMissionElement(mission) {
 
                     ? `
 
-                        <span class="mission-claimed-label">
+                        <span
+
+                            class="mission-claimed-label"
+
+                        >
 
                             دریافت شد ✓
 
@@ -1795,7 +3878,11 @@ function createMissionElement(mission) {
 
                                 class="primary-button mission-claim-button"
 
-                                data-mission-id="${mission.id}"
+                                data-mission-id="${escapeMissionHTML(
+
+                                    mission.id
+
+                                )}"
 
                             >
 
@@ -1805,15 +3892,35 @@ function createMissionElement(mission) {
 
                         `
 
-                        : `
+                        : mission.unlocked === false
 
-                            <span class="mission-progress-label">
+                            ? `
 
-                                در حال انجام
+                                <span
 
-                            </span>
+                                    class="mission-progress-label"
 
-                        `
+                                >
+
+                                    🔒 قفل
+
+                                </span>
+
+                            `
+
+                            : `
+
+                                <span
+
+                                    class="mission-progress-label"
+
+                                >
+
+                                    در حال انجام
+
+                                </span>
+
+                            `
 
             }
 
@@ -1827,37 +3934,558 @@ function createMissionElement(mission) {
 
 
 /* ============================================================
-   31. ESCAPE HTML
+   49. RENDER TREE
 ============================================================ */
 
-function escapeMissionHTML(value) {
+function renderMissionTree() {
 
-    return String(value)
+    const container =
 
-        .replace(/&/g, "&amp;")
+        document.getElementById(
 
-        .replace(/</g, "&lt;")
+            "mission-tree"
 
-        .replace(/>/g, "&gt;")
+        );
 
-        .replace(/"/g, "&quot;")
+    if (!container) {
 
-        .replace(/'/g, "&#039;");
+        return;
+
+    }
+
+    updateMissionTreeStatuses();
+
+    container.innerHTML = "";
+
+    const branches =
+
+        Object.values(
+
+            MISSION_BRANCHES
+
+        );
+
+    branches.forEach(
+
+        branch => {
+
+            const branchMissions =
+
+                missionsState.tree
+
+                    .filter(
+
+                        mission =>
+
+                            mission.branch ===
+
+                            branch.id
+
+                    )
+
+                    .sort(
+
+                        (a, b) =>
+
+                            a.order -
+
+                            b.order
+
+                    );
+
+            if (
+
+                branchMissions.length === 0
+
+            ) {
+
+                return;
+
+            }
+
+            const branchElement =
+
+                createMissionBranchElement(
+
+                    branch,
+
+                    branchMissions
+
+                );
+
+            container.appendChild(
+
+                branchElement
+
+            );
+
+        }
+
+    );
 
 }
 
 
 /* ============================================================
-   32. CLAIM BUTTON HANDLER
+   50. CREATE TREE BRANCH
 ============================================================ */
 
-function handleMissionContainerClick(event) {
+function createMissionBranchElement(
 
-    const button = event.target.closest(
+    branch,
 
-        ".mission-claim-button"
+    missions
+
+) {
+
+    const branchWrapper =
+
+        document.createElement(
+
+            "section"
+
+        );
+
+    branchWrapper.className =
+
+        "mission-tree-branch";
+
+    branchWrapper.dataset.branch =
+
+        branch.id;
+
+    branchWrapper.innerHTML = `
+
+        <div class="mission-tree-branch-header">
+
+            <div class="mission-tree-branch-icon">
+
+                ${escapeMissionHTML(
+
+                    branch.icon
+
+                )}
+
+            </div>
+
+            <div>
+
+                <h3>
+
+                    ${escapeMissionHTML(
+
+                        branch.title
+
+                    )}
+
+                </h3>
+
+                <p>
+
+                    ${escapeMissionHTML(
+
+                        branch.description
+
+                    )}
+
+                </p>
+
+            </div>
+
+        </div>
+
+        <div class="mission-tree-path"></div>
+
+    `;
+
+    const path =
+
+        branchWrapper.querySelector(
+
+            ".mission-tree-path"
+
+        );
+
+    missions.forEach(
+
+        (mission, index) => {
+
+            const node =
+
+                createMissionTreeNode(
+
+                    mission,
+
+                    index <
+
+                        missions.length - 1
+
+                );
+
+            path.appendChild(
+
+                node
+
+            );
+
+        }
 
     );
+
+    return branchWrapper;
+
+}
+
+
+/* ============================================================
+   51. CREATE TREE NODE
+============================================================ */
+
+function createMissionTreeNode(
+
+    mission,
+
+    hasNext
+
+) {
+
+    const node =
+
+        document.createElement(
+
+            "div"
+
+        );
+
+    node.className =
+
+        "mission-tree-node";
+
+    node.dataset.missionId =
+
+        mission.id;
+
+    node.dataset.status =
+
+        mission.status;
+
+    node.dataset.tier =
+
+        mission.tier;
+
+    if (mission.claimed) {
+
+        node.classList.add(
+
+            "tree-node-claimed"
+
+        );
+
+    } else if (
+
+        mission.completed
+
+    ) {
+
+        node.classList.add(
+
+            "tree-node-completed"
+
+        );
+
+    } else if (
+
+        mission.unlocked
+
+    ) {
+
+        node.classList.add(
+
+            "tree-node-unlocked"
+
+        );
+
+    } else {
+
+        node.classList.add(
+
+            "tree-node-locked"
+
+        );
+
+    }
+
+    const percentage =
+
+        mission.target > 0
+
+            ? Math.round(
+
+                (
+
+                    mission.progress /
+
+                    mission.target
+
+                ) * 100
+
+            )
+
+            : 0;
+
+    node.innerHTML = `
+
+        <div class="mission-tree-node-card">
+
+            <div class="mission-tree-node-top">
+
+                <span class="mission-tree-node-tier">
+
+                    مرحله ${mission.tier}
+
+                </span>
+
+                <span class="mission-tree-node-icon">
+
+                    ${escapeMissionHTML(
+
+                        mission.icon
+
+                    )}
+
+                </span>
+
+            </div>
+
+            <h4>
+
+                ${escapeMissionHTML(
+
+                    mission.title
+
+                )}
+
+            </h4>
+
+            <p>
+
+                ${escapeMissionHTML(
+
+                    mission.description
+
+                )}
+
+            </p>
+
+            <div class="mission-tree-progress">
+
+                <div
+
+                    class="mission-tree-progress-fill"
+
+                    style="width:${Math.min(
+
+                        100,
+
+                        Math.max(
+
+                            0,
+
+                            percentage
+
+                        )
+
+                    )}%"
+
+                ></div>
+
+            </div>
+
+            <div class="mission-tree-node-footer">
+
+                <span>
+
+                    ${mission.progress}/${mission.target}
+
+                </span>
+
+                <span>
+
+                    🪙 ${mission.rewardCoins}
+
+                </span>
+
+            </div>
+
+            ${
+
+                mission.claimed
+
+                    ? `
+
+                        <div class="mission-tree-status">
+
+                            ✓ دریافت شد
+
+                        </div>
+
+                    `
+
+                    : mission.completed
+
+                        ? `
+
+                            <button
+
+                                type="button"
+
+                                class="mission-claim-button"
+
+                                data-mission-id="${escapeMissionHTML(
+
+                                    mission.id
+
+                                )}"
+
+                            >
+
+                                دریافت پاداش
+
+                            </button>
+
+                        `
+
+                        : mission.unlocked
+
+                            ? `
+
+                                <div class="mission-tree-status">
+
+                                    ${
+
+                                        mission.progress > 0
+
+                                            ? "در حال پیشرفت"
+
+                                            : "باز شده"
+
+                                    }
+
+                                </div>
+
+                            `
+
+                            : `
+
+                                <div class="mission-tree-status">
+
+                                    🔒 با تکمیل مرحله قبل باز می‌شود
+
+                                </div>
+
+                            `
+
+            }
+
+        </div>
+
+        ${
+
+            hasNext
+
+                ? `
+
+                    <div class="mission-tree-connector">
+
+                        <span></span>
+
+                    </div>
+
+                `
+
+                : ""
+
+        }
+
+    `;
+
+    return node;
+
+}
+
+
+/* ============================================================
+   52. ESCAPE HTML
+============================================================ */
+
+function escapeMissionHTML(
+
+    value
+
+) {
+
+    return String(value)
+
+        .replace(
+
+            /&/g,
+
+            "&amp;"
+
+        )
+
+        .replace(
+
+            /</g,
+
+            "&lt;"
+
+        )
+
+        .replace(
+
+            />/g,
+
+            "&gt;"
+
+        )
+
+        .replace(
+
+            /"/g,
+
+            "&quot;"
+
+        )
+
+        .replace(
+
+            /'/g,
+
+            "&#039;"
+
+        );
+
+}
+
+
+/* ============================================================
+   53. CLAIM BUTTON HANDLER
+============================================================ */
+
+function handleMissionContainerClick(
+
+    event
+
+) {
+
+    const button =
+
+        event.target.closest(
+
+            ".mission-claim-button"
+
+        );
 
     if (!button) {
 
@@ -1865,7 +4493,9 @@ function handleMissionContainerClick(event) {
 
     }
 
-    const missionId = button.dataset.missionId;
+    const missionId =
+
+        button.dataset.missionId;
 
     if (!missionId) {
 
@@ -1873,50 +4503,70 @@ function handleMissionContainerClick(event) {
 
     }
 
-    claimMissionReward(missionId);
+    claimMissionReward(
+
+        missionId
+
+    );
 
 }
 
 
 /* ============================================================
-   33. HOME MISSION WIDGET
+   54. HOME MISSION WIDGET
 ============================================================ */
 
 function updateHomeMissionWidget() {
 
-    const titleElement = document.getElementById(
+    const titleElement =
 
-        "daily-mission-title"
+        document.getElementById(
 
-    );
+            "daily-mission-title"
 
-    const progressElement = document.getElementById(
+        );
 
-        "daily-mission-progress"
+    const progressElement =
 
-    );
+        document.getElementById(
 
-    const countElement = document.getElementById(
+            "daily-mission-progress"
 
-        "daily-mission-count"
+        );
 
-    );
+    const countElement =
 
-    if (!titleElement ||
+        document.getElementById(
+
+            "daily-mission-count"
+
+        );
+
+    if (
+
+        !titleElement ||
 
         !progressElement ||
 
-        !countElement) {
+        !countElement
+
+    ) {
 
         return;
 
     }
 
-    const mission = missionsState.daily.find(
+    const mission =
 
-        item => !item.claimed
+        missionsState.daily.find(
 
-    ) || missionsState.daily[0];
+            item =>
+
+                !item.claimed
+
+        ) ||
+
+        missionsState.daily[0];
 
     if (!mission) {
 
@@ -1924,27 +4574,43 @@ function updateHomeMissionWidget() {
 
     }
 
-    titleElement.textContent = mission.title;
+    titleElement.textContent =
 
-    const percentage = mission.target > 0
+        mission.title;
 
-        ? Math.round(
+    const percentage =
 
-            (
+        mission.target > 0
 
-                mission.progress /
+            ? Math.round(
 
-                mission.target
+                (
 
-            ) * 100
+                    mission.progress /
 
-        )
+                    mission.target
 
-        : 0;
+                ) * 100
+
+            )
+
+            : 0;
 
     progressElement.style.width =
 
-        `${percentage}%`;
+        `${Math.min(
+
+            100,
+
+            Math.max(
+
+                0,
+
+                percentage
+
+            )
+
+        )}%`;
 
     countElement.textContent =
 
@@ -1954,16 +4620,22 @@ function updateHomeMissionWidget() {
 
 
 /* ============================================================
-   34. TOAST
+   55. TOAST
 ============================================================ */
 
-function showMissionToast(message) {
+function showMissionToast(
+
+    message
+
+) {
 
     if (
 
         window.HokmUI &&
 
-        typeof window.HokmUI.showToast === "function"
+        typeof window.HokmUI.showToast ===
+
+            "function"
 
     ) {
 
@@ -1979,11 +4651,13 @@ function showMissionToast(message) {
 
     }
 
-    const container = document.getElementById(
+    const container =
 
-        "toast-container"
+        document.getElementById(
 
-    );
+            "toast-container"
+
+        );
 
     if (!container) {
 
@@ -1991,38 +4665,68 @@ function showMissionToast(message) {
 
     }
 
-    const toast = document.createElement("div");
+    const toast =
 
-    toast.className = "toast success-toast";
+        document.createElement(
 
-    toast.textContent = message;
+            "div"
 
-    container.appendChild(toast);
+        );
 
-    setTimeout(() => {
+    toast.className =
 
-        toast.classList.add("toast-hide");
+        "toast success-toast";
 
-        setTimeout(() => {
+    toast.textContent =
 
-            toast.remove();
+        message;
 
-        }, 300);
+    container.appendChild(
 
-    }, 3000);
+        toast
+
+    );
+
+    setTimeout(
+
+        () => {
+
+            toast.classList.add(
+
+                "toast-hide"
+
+            );
+
+            setTimeout(
+
+                () => {
+
+                    toast.remove();
+
+                },
+
+                300
+
+            );
+
+        },
+
+        3000
+
+    );
 
 }
 
 
 /* ============================================================
-   35. GET DAILY MISSIONS
+   56. GET DAILY
 ============================================================ */
 
 function getDailyMissions() {
 
-    return missionsState.daily.map(
+    return cloneMissionData(
 
-        mission => ({ ...mission })
+        missionsState.daily
 
     );
 
@@ -2030,14 +4734,14 @@ function getDailyMissions() {
 
 
 /* ============================================================
-   36. GET WEEKLY MISSIONS
+   57. GET WEEKLY
 ============================================================ */
 
 function getWeeklyMissions() {
 
-    return missionsState.weekly.map(
+    return cloneMissionData(
 
-        mission => ({ ...mission })
+        missionsState.weekly
 
     );
 
@@ -2045,14 +4749,75 @@ function getWeeklyMissions() {
 
 
 /* ============================================================
-   37. GET COMPLETED MISSIONS
+   58. GET MONTHLY
+============================================================ */
+
+function getMonthlyMissions() {
+
+    return cloneMissionData(
+
+        missionsState.monthly
+
+    );
+
+}
+
+
+/* ============================================================
+   59. GET TREE
+============================================================ */
+
+function getMissionTree() {
+
+    updateMissionTreeStatuses();
+
+    return cloneMissionData(
+
+        missionsState.tree
+
+    );
+
+}
+
+
+/* ============================================================
+   60. GET BRANCH
+============================================================ */
+
+function getMissionBranch(
+
+    branchId
+
+) {
+
+    return cloneMissionData(
+
+        missionsState.tree.filter(
+
+            mission =>
+
+                mission.branch ===
+
+                branchId
+
+        )
+
+    );
+
+}
+
+
+/* ============================================================
+   61. GET COMPLETED
 ============================================================ */
 
 function getCompletedMissions() {
 
     return getAllMissions().filter(
 
-        mission => mission.completed
+        mission =>
+
+            mission.completed
 
     );
 
@@ -2060,7 +4825,7 @@ function getCompletedMissions() {
 
 
 /* ============================================================
-   38. GET CLAIMABLE MISSIONS
+   62. GET CLAIMABLE
 ============================================================ */
 
 function getClaimableMissions() {
@@ -2071,7 +4836,9 @@ function getClaimableMissions() {
 
             mission.completed &&
 
-            !mission.claimed
+            !mission.claimed &&
+
+            mission.unlocked !== false
 
     );
 
@@ -2079,12 +4846,39 @@ function getClaimableMissions() {
 
 
 /* ============================================================
-   39. GET MISSION PROGRESS
+   63. GET LOCKED TREE MISSIONS
 ============================================================ */
 
-function getMissionProgress(missionId) {
+function getLockedTreeMissions() {
 
-    const mission = findMission(missionId);
+    return missionsState.tree.filter(
+
+        mission =>
+
+            mission.unlocked === false
+
+    );
+
+}
+
+
+/* ============================================================
+   64. GET MISSION PROGRESS
+============================================================ */
+
+function getMissionProgress(
+
+    missionId
+
+) {
+
+    const mission =
+
+        findMission(
+
+            missionId
+
+        );
 
     if (!mission) {
 
@@ -2094,9 +4888,13 @@ function getMissionProgress(missionId) {
 
     return {
 
-        progress: mission.progress,
+        progress:
 
-        target: mission.target,
+            mission.progress,
+
+        target:
+
+            mission.target,
 
         percentage:
 
@@ -2116,9 +4914,21 @@ function getMissionProgress(missionId) {
 
                 : 0,
 
-        completed: mission.completed,
+        completed:
 
-        claimed: mission.claimed
+            mission.completed,
+
+        claimed:
+
+            mission.claimed,
+
+        unlocked:
+
+            mission.unlocked !== false,
+
+        status:
+
+            mission.status
 
     };
 
@@ -2126,12 +4936,22 @@ function getMissionProgress(missionId) {
 
 
 /* ============================================================
-   40. COMPLETE MISSION DIRECTLY
+   65. COMPLETE MISSION DIRECTLY
 ============================================================ */
 
-function completeMission(missionId) {
+function completeMission(
 
-    const mission = findMission(missionId);
+    missionId
+
+) {
+
+    const mission =
+
+        findMission(
+
+            missionId
+
+        );
 
     if (!mission) {
 
@@ -2139,11 +4959,37 @@ function completeMission(missionId) {
 
     }
 
-    mission.progress = mission.target;
+    if (
 
-    mission.completed = true;
+        mission.category ===
 
-    mission.completedAt = Date.now();
+            MISSION_CATEGORIES.TREE &&
+
+        mission.unlocked === false
+
+    ) {
+
+        return false;
+
+    }
+
+    mission.progress =
+
+        mission.target;
+
+    mission.completed =
+
+        true;
+
+    mission.status =
+
+        MISSION_STATUS.COMPLETED;
+
+    mission.completedAt =
+
+        Date.now();
+
+    updateMissionTreeStatuses();
 
     saveMissionsState();
 
@@ -2163,14 +5009,22 @@ function completeMission(missionId) {
 
 
 /* ============================================================
-   41. RESET ALL MISSIONS
+   66. RESET ALL
 ============================================================ */
 
 function resetAllMissions() {
 
-    missionsState.daily = selectDailyMissions();
+    missionsState.daily =
 
-    missionsState.weekly = selectWeeklyMissions();
+        selectDailyMissions();
+
+    missionsState.weekly =
+
+        selectWeeklyMissions();
+
+    missionsState.monthly =
+
+        selectMonthlyMissions();
 
     missionsState.lastDailyReset =
 
@@ -2179,6 +5033,12 @@ function resetAllMissions() {
     missionsState.lastWeeklyReset =
 
         missionWeekKey();
+
+    missionsState.lastMonthlyReset =
+
+        missionMonthKey();
+
+    updateMissionTreeStatuses();
 
     saveMissionsState();
 
@@ -2196,95 +5056,552 @@ function resetAllMissions() {
 
 
 /* ============================================================
-   42. INITIALIZE DOM EVENTS
+   67. RESET DAILY ONLY
 ============================================================ */
 
-function initializeMissionDOMEvents() {
+function resetDailyMissions() {
 
-    const dailyContainer = document.getElementById(
+    missionsState.daily =
 
-        "daily-missions"
+        selectDailyMissions();
+
+    missionsState.lastDailyReset =
+
+        missionDateKey();
+
+    saveMissionsState();
+
+    renderAllMissions();
+
+    dispatchMissionEvent(
+
+        "dailyMissionsReset",
+
+        missionsState.daily
 
     );
-
-    const weeklyContainer = document.getElementById(
-
-        "weekly-missions"
-
-    );
-
-    if (dailyContainer) {
-
-        dailyContainer.addEventListener(
-
-            "click",
-
-            handleMissionContainerClick
-
-        );
-
-    }
-
-    if (weeklyContainer) {
-
-        weeklyContainer.addEventListener(
-
-            "click",
-
-            handleMissionContainerClick
-
-        );
-
-    }
 
 }
 
 
 /* ============================================================
-   43. PUBLIC API
+   68. RESET WEEKLY ONLY
+============================================================ */
+
+function resetWeeklyMissions() {
+
+    missionsState.weekly =
+
+        selectWeeklyMissions();
+
+    missionsState.lastWeeklyReset =
+
+        missionWeekKey();
+
+    saveMissionsState();
+
+    renderAllMissions();
+
+    dispatchMissionEvent(
+
+        "weeklyMissionsReset",
+
+        missionsState.weekly
+
+    );
+
+}
+
+
+/* ============================================================
+   69. RESET MONTHLY ONLY
+============================================================ */
+
+function resetMonthlyMissions() {
+
+    missionsState.monthly =
+
+        selectMonthlyMissions();
+
+    missionsState.lastMonthlyReset =
+
+        missionMonthKey();
+
+    saveMissionsState();
+
+    renderAllMissions();
+
+    dispatchMissionEvent(
+
+        "monthlyMissionsReset",
+
+        missionsState.monthly
+
+    );
+
+}
+
+
+/* ============================================================
+   70. RESET TREE
+============================================================ */
+
+function resetMissionTree() {
+
+    missionsState.tree =
+
+        MISSION_TREE_DEFINITIONS.map(
+
+            definition =>
+
+                createMissionInstance(
+
+                    definition,
+
+                    MISSION_CATEGORIES.TREE
+
+                )
+
+        );
+
+    updateMissionTreeStatuses();
+
+    saveMissionsState();
+
+    renderAllMissions();
+
+    dispatchMissionEvent(
+
+        "missionTreeReset",
+
+        getMissionTree()
+
+    );
+
+}
+
+
+/* ============================================================
+   71. GET TREE PROGRESS
+============================================================ */
+
+function getMissionTreeProgress() {
+
+    const tree =
+
+        missionsState.tree;
+
+    if (!tree.length) {
+
+        return {
+
+            total: 0,
+
+            completed: 0,
+
+            claimed: 0,
+
+            percentage: 0
+
+        };
+
+    }
+
+    const completed =
+
+        tree.filter(
+
+            mission =>
+
+                mission.completed
+
+        ).length;
+
+    const claimed =
+
+        tree.filter(
+
+            mission =>
+
+                mission.claimed
+
+        ).length;
+
+    return {
+
+        total:
+
+            tree.length,
+
+        completed:
+
+            completed,
+
+        claimed:
+
+            claimed,
+
+        percentage:
+
+            Math.round(
+
+                (
+
+                    claimed /
+
+                    tree.length
+
+                ) * 100
+
+            )
+
+    };
+
+}
+
+
+/* ============================================================
+   72. GET BRANCH PROGRESS
+============================================================ */
+
+function getBranchProgress(
+
+    branchId
+
+) {
+
+    const missions =
+
+        missionsState.tree.filter(
+
+            mission =>
+
+                mission.branch ===
+
+                branchId
+
+        );
+
+    if (!missions.length) {
+
+        return {
+
+            total: 0,
+
+            completed: 0,
+
+            claimed: 0,
+
+            percentage: 0
+
+        };
+
+    }
+
+    const claimed =
+
+        missions.filter(
+
+            mission =>
+
+                mission.claimed
+
+        ).length;
+
+    const completed =
+
+        missions.filter(
+
+            mission =>
+
+                mission.completed
+
+        ).length;
+
+    return {
+
+        total:
+
+            missions.length,
+
+        completed:
+
+            completed,
+
+        claimed:
+
+            claimed,
+
+        percentage:
+
+            Math.round(
+
+                (
+
+                    claimed /
+
+                    missions.length
+
+                ) * 100
+
+            )
+
+    };
+
+}
+
+
+/* ============================================================
+   73. DOM EVENTS
+============================================================ */
+
+function initializeMissionDOMEvents() {
+
+    if (
+
+        missionsDOMEventsInitialized
+
+    ) {
+
+        return;
+
+    }
+
+    missionsDOMEventsInitialized =
+
+        true;
+
+    const containers = [
+
+        "daily-missions",
+
+        "weekly-missions",
+
+        "monthly-missions",
+
+        "mission-tree"
+
+    ];
+
+    containers.forEach(
+
+        id => {
+
+            const container =
+
+                document.getElementById(
+
+                    id
+
+                );
+
+            if (!container) {
+
+                return;
+
+            }
+
+            container.addEventListener(
+
+                "click",
+
+                handleMissionContainerClick
+
+            );
+
+        }
+
+    );
+
+}
+
+
+/* ============================================================
+   74. REFRESH
+============================================================ */
+
+function refreshMissions() {
+
+    checkMissionResets();
+
+    updateMissionTreeStatuses();
+
+    renderAllMissions();
+
+    saveMissionsState();
+
+    return getMissionsState();
+
+}
+
+
+/* ============================================================
+   75. PUBLIC API
 ============================================================ */
 
 window.HokmMissions = {
 
-    initialize: initializeMissions,
+    /* Core */
 
-    getState: getMissionsState,
+    initialize:
 
-    getAll: getAllMissions,
+        initializeMissions,
 
-    getDaily: getDailyMissions,
+    refresh:
 
-    getWeekly: getWeeklyMissions,
+        refreshMissions,
 
-    getCompleted: getCompletedMissions,
+    getState:
 
-    getClaimable: getClaimableMissions,
+        getMissionsState,
 
-    find: findMission,
+    getAll:
 
-    getProgress: getMissionProgress,
+        getAllMissions,
 
-    update: updateMissionProgress,
+    find:
 
-    updateByType: updateMissionsByType,
+        findMission,
 
-    complete: completeMission,
 
-    claimReward: claimMissionReward,
+    /* Daily */
 
-    render: renderAllMissions,
+    getDaily:
 
-    reset: resetAllMissions,
+        getDailyMissions,
 
-    types: MISSION_TYPES,
+    resetDaily:
 
-    categories: MISSION_CATEGORIES
+        resetDailyMissions,
+
+
+    /* Weekly */
+
+    getWeekly:
+
+        getWeeklyMissions,
+
+    resetWeekly:
+
+        resetWeeklyMissions,
+
+
+    /* Monthly */
+
+    getMonthly:
+
+        getMonthlyMissions,
+
+    resetMonthly:
+
+        resetMonthlyMissions,
+
+
+    /* Tree */
+
+    getTree:
+
+        getMissionTree,
+
+    getBranch:
+
+        getMissionBranch,
+
+    getBranchProgress:
+
+        getBranchProgress,
+
+    getTreeProgress:
+
+        getMissionTreeProgress,
+
+    getLockedTree:
+
+        getLockedTreeMissions,
+
+    resetTree:
+
+        resetMissionTree,
+
+
+    /* Progress */
+
+    getProgress:
+
+        getMissionProgress,
+
+    update:
+
+        updateMissionProgress,
+
+    updateByType:
+
+        updateMissionsByType,
+
+    complete:
+
+        completeMission,
+
+
+    /* Rewards */
+
+    claimReward:
+
+        claimMissionReward,
+
+    getClaimable:
+
+        getClaimableMissions,
+
+
+    /* Statistics */
+
+    getCompleted:
+
+        getCompletedMissions,
+
+
+    /* UI */
+
+    render:
+
+        renderAllMissions,
+
+
+    /* Reset */
+
+    reset:
+
+        resetAllMissions,
+
+
+    /* Constants */
+
+    types:
+
+        MISSION_TYPES,
+
+    categories:
+
+        MISSION_CATEGORIES,
+
+    statuses:
+
+        MISSION_STATUS,
+
+    branches:
+
+        MISSION_BRANCHES,
+
+    tiers:
+
+        MISSION_TIERS
 
 };
 
 
 /* ============================================================
-   44. STARTUP
+   76. STARTUP
 ============================================================ */
 
 function startMissionsSystem() {
@@ -2299,16 +5616,28 @@ function startMissionsSystem() {
 
 
 /* ============================================================
-   45. DOM READY
+   77. DOM READY
 ============================================================ */
 
-if (document.readyState === "loading") {
+if (
+
+    document.readyState ===
+
+    "loading"
+
+) {
 
     document.addEventListener(
 
         "DOMContentLoaded",
 
-        startMissionsSystem
+        startMissionsSystem,
+
+        {
+
+            once: true
+
+        }
 
     );
 
@@ -2317,6 +5646,128 @@ if (document.readyState === "loading") {
     startMissionsSystem();
 
 }
+
+
+/* ============================================================
+   78. PERIODIC RESET CHECK
+============================================================ */
+
+setInterval(
+
+    () => {
+
+        if (
+
+            !missionsState.initialized
+
+        ) {
+
+            return;
+
+        }
+
+        checkMissionResets();
+
+    },
+
+    60 * 1000
+
+);
+
+
+/* ============================================================
+   79. PAGE VISIBILITY
+============================================================ */
+
+document.addEventListener(
+
+    "visibilitychange",
+
+    () => {
+
+        if (
+
+            document.visibilityState ===
+
+            "visible"
+
+        ) {
+
+            checkMissionResets();
+
+            updateMissionTreeStatuses();
+
+            renderAllMissions();
+
+        }
+
+    }
+
+);
+
+
+/* ============================================================
+   80. BACKWARD COMPATIBILITY
+============================================================ */
+
+/*
+   برای اینکه فایل‌های قبلی پروژه که ممکن است
+   مستقیماً این توابع را صدا بزنند دچار مشکل نشوند،
+   API اصلی همچنان از طریق HokmMissions در دسترس است.
+
+   هیچ API قبلی حذف نشده است.
+*/
+
+
+/* ============================================================
+   81. DEBUG API
+============================================================ */
+
+window.HokmMissionsDebug = {
+
+    state:
+
+        () =>
+
+            getMissionsState(),
+
+    tree:
+
+        () =>
+
+            getMissionTree(),
+
+    daily:
+
+        () =>
+
+            getDailyMissions(),
+
+    weekly:
+
+        () =>
+
+            getWeeklyMissions(),
+
+    monthly:
+
+        () =>
+
+            getMonthlyMissions(),
+
+    progress:
+
+        () =>
+
+            getMissionTreeProgress(),
+
+    resetAll:
+
+        () =>
+
+            resetAllMissions()
+
+};
 
 
 /* ============================================================
