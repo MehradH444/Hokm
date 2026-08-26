@@ -2505,7 +2505,7 @@ img {
 
 
 /* =========================================================
-   28. MISSIONS
+   28. MISSIONS & MISSION TREE
 ========================================================= */
 
 .mission-category {
@@ -2534,6 +2534,11 @@ img {
     border: 1px solid var(--color-border);
     border-radius: 13px;
     background: var(--color-surface);
+    transition: transform var(--transition-fast), border-color var(--transition-normal);
+}
+
+.mission-item:active {
+    transform: scale(0.98);
 }
 
 
@@ -2545,30 +2550,378 @@ img {
     justify-content: center;
     border-radius: 11px;
     background: rgba(245, 158, 11, 0.12);
+    font-size: 20px;
 }
 
 
 .mission-item-content {
     flex: 1;
+    min-width: 0;
 }
 
 
 .mission-item-content strong {
     display: block;
-    font-size: 11px;
+    font-size: 12px;
+    margin-bottom: 2px;
 }
 
 
-.mission-item-content span {
+.mission-item-content p {
+    color: var(--color-text-muted);
+    font-size: 10px;
+    margin-bottom: 6px;
+}
+
+
+.mission-item-progress {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+
+.mission-item-progress .progress-bar {
+    flex: 1;
+    height: 5px;
+}
+
+
+.mission-item-progress span {
     color: var(--color-text-muted);
     font-size: 9px;
+    white-space: nowrap;
 }
 
 
-.mission-reward {
-    color: var(--color-warning);
+.mission-item-reward {
+    display: flex;
+    gap: 8px;
+    margin-top: 6px;
     font-size: 10px;
-    font-weight: 900;
+    color: var(--color-warning);
+    font-weight: 800;
+}
+
+
+.mission-item-action {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 5px;
+}
+
+
+.mission-claim-button {
+    padding: 6px 12px;
+    border-radius: var(--radius-sm);
+    background: var(--color-success);
+    color: white;
+    font-size: 11px;
+    font-weight: 800;
+    animation: pulse-claim 2s infinite;
+}
+
+@keyframes pulse-claim {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.4); }
+    50% { box-shadow: 0 0 0 6px rgba(22, 163, 74, 0); }
+}
+
+
+.mission-claimed-label {
+    font-size: 10px;
+    color: var(--color-success);
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+
+
+.mission-progress-label {
+    font-size: 10px;
+    color: var(--color-text-muted);
+    font-weight: 700;
+}
+
+
+.mission-item.mission-completed {
+    border-color: rgba(22, 163, 74, 0.3);
+    background: rgba(22, 163, 74, 0.05);
+}
+
+
+.mission-item.mission-claimed {
+    opacity: 0.7;
+}
+
+
+.mission-item.mission-locked {
+    opacity: 0.5;
+    filter: grayscale(0.6);
+}
+
+
+/* =========================================================
+   28.1 MISSION TREE SPECIFIC STYLES
+========================================================= */
+
+.mission-tree-container {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    padding: 10px 0;
+}
+
+
+.mission-tree-branch {
+    position: relative;
+    padding: 16px;
+    border-radius: var(--radius-lg);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+}
+
+
+/* Branch Color Themes */
+.mission-tree-branch[data-branch="beginner"] { --branch-color: var(--color-success); }
+.mission-tree-branch[data-branch="play"] { --branch-color: var(--color-primary); }
+.mission-tree-branch[data-branch="win"] { --branch-color: var(--color-warning); }
+.mission-tree-branch[data-branch="ranked"] { --branch-color: var(--color-secondary); }
+.mission-tree-branch[data-branch="friends"] { --branch-color: var(--color-info); }
+.mission-tree-branch[data-branch="master"] { --branch-color: var(--color-danger); }
+
+
+.mission-tree-branch-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+
+.mission-tree-branch-icon {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.05);
+    font-size: 24px;
+    border: 2px solid var(--branch-color, var(--color-border));
+}
+
+
+.mission-tree-branch-header h3 {
+    color: var(--branch-color, var(--color-text));
+    font-size: 16px;
+    font-weight: 800;
+    margin-bottom: 2px;
+}
+
+
+.mission-tree-branch-header p {
+    font-size: 11px;
+    color: var(--color-text-muted);
+    line-height: 1.4;
+}
+
+
+.mission-tree-path {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    padding-right: 28px; /* Space for the vertical line on the right (RTL) */
+}
+
+
+/* The main vertical connecting line */
+.mission-tree-path::before {
+    content: "";
+    position: absolute;
+    right: 14px; /* Center of the 28px padding */
+    top: 20px;
+    bottom: 20px;
+    width: 3px;
+    background: var(--color-border);
+    border-radius: 2px;
+    z-index: 0;
+}
+
+
+.mission-tree-node {
+    position: relative;
+    z-index: 1;
+    margin-bottom: 8px;
+}
+
+
+.mission-tree-node:last-child {
+    margin-bottom: 0;
+}
+
+
+/* Horizontal connector from node to main vertical line */
+.mission-tree-node::before {
+    content: "";
+    position: absolute;
+    right: -14px; /* Connects to the vertical line */
+    top: 28px; /* Aligns with the middle of the node header */
+    width: 14px;
+    height: 3px;
+    background: var(--color-border);
+    z-index: 0;
+}
+
+
+/* Color the path based on node status */
+.mission-tree-node.tree-node-unlocked::before,
+.mission-tree-node.tree-node-completed::before,
+.mission-tree-node.tree-node-claimed::before {
+    background: var(--branch-color, var(--color-primary));
+}
+
+
+.mission-tree-node-card {
+    position: relative;
+    padding: 14px;
+    border-radius: var(--radius-md);
+    background: var(--color-background-tertiary);
+    border: 1px solid var(--color-border);
+    transition: all var(--transition-normal);
+    margin-right: 12px; /* Offset from the line */
+}
+
+
+/* Node Status Variations */
+.mission-tree-node.tree-node-locked .mission-tree-node-card {
+    opacity: 0.6;
+    filter: grayscale(0.8);
+    border-color: var(--color-border);
+}
+
+
+.mission-tree-node.tree-node-unlocked .mission-tree-node-card {
+    border-color: var(--branch-color, var(--color-primary));
+    box-shadow: 0 0 15px rgba(37, 99, 235, 0.1);
+}
+
+
+.mission-tree-node.tree-node-completed .mission-tree-node-card {
+    border-color: var(--color-success);
+    background: rgba(22, 163, 74, 0.08);
+}
+
+
+.mission-tree-node.tree-node-claimed .mission-tree-node-card {
+    border-color: var(--color-warning);
+    background: rgba(245, 158, 11, 0.08);
+}
+
+
+.mission-tree-node-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+
+.mission-tree-node-tier {
+    font-size: 10px;
+    font-weight: 800;
+    color: var(--color-text-muted);
+    background: rgba(255, 255, 255, 0.05);
+    padding: 2px 8px;
+    border-radius: 50px;
+}
+
+
+.mission-tree-node-icon {
+    font-size: 24px;
+}
+
+
+.mission-tree-node-card h4 {
+    font-size: 13px;
+    font-weight: 800;
+    margin-bottom: 4px;
+    color: var(--color-text);
+}
+
+
+.mission-tree-node-card p {
+    font-size: 11px;
+    color: var(--color-text-secondary);
+    margin-bottom: 10px;
+    line-height: 1.4;
+}
+
+
+.mission-tree-progress {
+    height: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 50px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+
+.mission-tree-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--branch-color, var(--color-primary)), var(--color-primary-light));
+    border-radius: 50px;
+    transition: width 0.5s ease;
+}
+
+
+.mission-tree-node-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    color: var(--color-text-muted);
+    margin-bottom: 10px;
+}
+
+
+.mission-tree-status {
+    text-align: center;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 8px;
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--color-text-secondary);
+}
+
+
+/* Connector between nodes (generated by JS when hasNext is true) */
+.mission-tree-connector {
+    height: 24px;
+    position: relative;
+    margin-right: 12px; /* Align with card */
+}
+
+
+.mission-tree-connector span {
+    position: absolute;
+    right: 12px; /* Align with the vertical line */
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--color-border);
+    border-radius: 2px;
+}
+
+
+.mission-tree-node.tree-node-completed + .mission-tree-connector span,
+.mission-tree-node.tree-node-claimed + .mission-tree-connector span,
+.mission-tree-node.tree-node-unlocked + .mission-tree-connector span {
+    background: var(--branch-color, var(--color-primary));
 }
 
 
@@ -3299,352 +3652,4 @@ img {
 }
 
 
-@keyframes toast-out {
-
-    from {
-        opacity: 1;
-    }
-
-    to {
-        opacity: 0;
-        transform: translateY(-10px);
-    }
-}
-
-
-/* =========================================================
-   37. CONNECTION STATUS
-========================================================= */
-
-.connection-status {
-    position: fixed;
-    z-index: 1500;
-    top: 7px;
-    left: 50%;
-    transform: translateX(-50%);
-    padding: 4px 9px;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    border-radius: 50px;
-    background: rgba(0, 0, 0, 0.4);
-    color: rgba(255, 255, 255, 0.75);
-    font-size: 8px;
-}
-
-
-#connection-status-icon {
-    color: #4ade80;
-}
-
-
-.offline-notice {
-    position: fixed;
-    z-index: 1600;
-    right: 10px;
-    bottom: calc(var(--bottom-nav-height) + 10px);
-    left: 10px;
-    padding: 9px 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 7px;
-    border-radius: 12px;
-    background: rgba(127, 29, 29, 0.95);
-    color: white;
-    font-size: 10px;
-    box-shadow: var(--shadow-lg);
-}
-
-
-/* =========================================================
-   38. SAFE AREA
-========================================================= */
-
-@supports (padding: env(safe-area-inset-bottom)) {
-
-    .game-page {
-        padding-bottom: env(safe-area-inset-bottom);
-    }
-
-}
-
-
-/* =========================================================
-   39. TOUCH OPTIMIZATION
-========================================================= */
-
-button,
-a,
-input,
-select,
-textarea {
-    -webkit-tap-highlight-color: transparent;
-}
-
-
-button {
-    touch-action: manipulation;
-}
-
-
-.playing-card {
-    touch-action: manipulation;
-}
-
-
-/* =========================================================
-   40. TABLET
-========================================================= */
-
-@media (min-width: 600px) {
-
-    :root {
-        --max-content-width: 680px;
-    }
-
-
-    .page-container {
-        padding-right: 20px;
-        padding-left: 20px;
-    }
-
-
-    .main-header {
-        padding-right: 20px;
-        padding-left: 20px;
-    }
-
-
-    .game-mode-grid {
-        grid-template-columns: repeat(4, 1fr);
-    }
-
-
-    .shop-content {
-        grid-template-columns: repeat(3, 1fr);
-    }
-
-
-    .room-players {
-        grid-template-columns: repeat(4, 1fr);
-    }
-
-
-    .profile-stats {
-        gap: 10px;
-    }
-
-}
-
-
-/* =========================================================
-   41. LARGE SCREENS
-========================================================= */
-
-@media (min-width: 900px) {
-
-    body {
-        background:
-            radial-gradient(
-                circle at center,
-                rgba(37, 99, 235, 0.08),
-                transparent 50%
-            ),
-            #020617;
-    }
-
-
-    .app {
-        max-width: 1100px;
-        margin: 0 auto;
-        border-right: 1px solid var(--color-border);
-        border-left: 1px solid var(--color-border);
-    }
-
-
-    .main-screen {
-        max-width: 100%;
-    }
-
-
-    .page-container {
-        max-width: 760px;
-    }
-
-
-    .bottom-navigation {
-        right: auto;
-        left: 50%;
-        width: 760px;
-        transform: translateX(-50%);
-        border-right: 1px solid var(--color-border);
-        border-left: 1px solid var(--color-border);
-        border-radius: 18px 18px 0 0;
-    }
-
-
-    .chat-panel {
-        right: 50%;
-        left: auto;
-        width: 420px;
-        transform: translateX(50%);
-        border: 1px solid var(--color-border);
-        border-radius: 22px;
-        bottom: 85px;
-    }
-
-}
-
-
-/* =========================================================
-   42. REDUCED MOTION
-========================================================= */
-
-@media (prefers-reduced-motion: reduce) {
-
-    *,
-    *::before,
-    *::after {
-        scroll-behavior: auto !important;
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
-    }
-
-}
-
-
-/* =========================================================
-   43. LANDSCAPE MOBILE
-========================================================= */
-
-@media (orientation: landscape) and (max-height: 500px) {
-
-    .game-page {
-        min-height: 100dvh;
-    }
-
-
-    .player-hand {
-        height: 88px;
-    }
-
-
-    .playing-card {
-        width: 48px;
-        height: 68px;
-    }
-
-
-    .player-bottom {
-        bottom: 75px;
-    }
-
-
-    .trick-area {
-        width: 150px;
-        height: 150px;
-    }
-
-
-    .played-card-slot {
-        width: 48px;
-        height: 68px;
-    }
-
-}
-
-
-/* =========================================================
-   44. EXTRA SMALL DEVICES
-========================================================= */
-
-@media (max-width: 340px) {
-
-    .page-container {
-        padding-right: 10px;
-        padding-left: 10px;
-    }
-
-
-    .main-header {
-        padding-right: 8px;
-        padding-left: 8px;
-    }
-
-
-    .header-user-info {
-        display: none;
-    }
-
-
-    .game-mode-card {
-        min-height: 105px;
-    }
-
-
-    .player-hand {
-        width: 100%;
-    }
-
-
-    .player-hand .playing-card {
-        margin-right: -20px;
-    }
-
-
-    .playing-card {
-        width: 53px;
-        height: 76px;
-    }
-
-
-    .card-rank {
-        font-size: 11px;
-    }
-
-
-    .card-suit {
-        font-size: 10px;
-    }
-
-
-    .card-center-suit {
-        font-size: 25px;
-    }
-
-
-    .profile-stats {
-        grid-template-columns: repeat(2, 1fr);
-    }
-
-}
-
-
-/* =========================================================
-   45. FOCUS ACCESSIBILITY
-========================================================= */
-
-button:focus-visible,
-input:focus-visible,
-textarea:focus-visible,
-select:focus-visible {
-    outline: 2px solid var(--color-primary-light);
-    outline-offset: 2px;
-}
-
-
-/* =========================================================
-   46. SELECTION
-========================================================= */
-
-::selection {
-    background: rgba(37, 99, 235, 0.5);
-    color: white;
-}
-
-
-/* =========================================================
-   END OF MAIN STYLESHEET
-========================================================= */
+@key
