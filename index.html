@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
@@ -26,9 +25,13 @@
     <title>حکم | بازی آنلاین حکم</title>
 
     <!--
-        فایل CSS اصلی پروژه
-        در مرحله بعد به صورت کامل ساخته می‌شود.
+        =========================================================
+        MAIN CSS
+        =========================================================
+
+        فایل استایل اصلی پروژه
     -->
+
     <link rel="stylesheet" href="style.css">
 </head>
 
@@ -2881,11 +2884,85 @@
 
 
     <!-- =========================================================
-         JAVASCRIPT
-         فعلاً فایل app.js در مرحله بعد ساخته می‌شود.
+         PROJECT JAVASCRIPT FILES
+         =========================================================
+
+         ترتیب فایل‌ها عمداً به صورت مرحله‌ای تنظیم شده است:
+         ابتدا تنظیمات و زیرساخت‌ها،
+         سپس storage/auth،
+         سپس منطق بازی و سیستم‌های جانبی،
+         و در انتها app/main برای راه‌اندازی برنامه.
+
+         database.sql در HTML با script بارگذاری نمی‌شود؛
+         این فایل باید در دیتابیس اجرا شود.
     ========================================================== -->
 
-    <script src="app.js"></script>
+
+    <!-- 1. Configuration -->
+    <script src="config.js" defer></script>
+
+    <!-- 2. Storage -->
+    <script src="storage.js" defer></script>
+
+    <!-- 3. Network -->
+    <script src="network.js" defer></script>
+
+    <!-- 4. Authentication -->
+    <script src="auth.js" defer></script>
+
+    <!-- 5. Profile -->
+    <script src="profile.js" defer></script>
+
+    <!-- 6. Wallet -->
+    <script src="wallet.js" defer></script>
+
+    <!-- 7. Shop -->
+    <script src="shop.js" defer></script>
+
+    <!-- 8. UI -->
+    <script src="ui.js" defer></script>
+
+    <!-- 9. Game Engine -->
+    <script src="game.js" defer></script>
+
+    <!-- 10. Room System -->
+    <script src="room.js" defer></script>
+
+    <!-- 11. Multiplayer -->
+    <script src="multiplayer.js" defer></script>
+
+    <!-- 12. Chat -->
+    <script src="chat.js" defer></script>
+
+    <!-- 13. Settings -->
+    <script src="settings.js" defer></script>
+
+    <!-- 14. Notifications -->
+    <script src="notifications.js" defer></script>
+
+    <!-- 15. Friends -->
+    <script src="friends.js" defer></script>
+
+    <!-- 16. Leaderboard -->
+    <script src="leaderboard.js" defer></script>
+
+    <!-- 17. Missions -->
+    <script src="missions.js" defer></script>
+
+    <!-- 18. History -->
+    <script src="history.js" defer></script>
+
+    <!-- 19. AI -->
+    <script src="ai.js" defer></script>
+
+    <!-- 20. Audio -->
+    <script src="audio.js" defer></script>
+
+    <!-- 21. Application Controller -->
+    <script src="app.js" defer></script>
+
+    <!-- 22. Main Bootstrap -->
+    <script src="main.js" defer></script>
 
 </body>
 </html>
